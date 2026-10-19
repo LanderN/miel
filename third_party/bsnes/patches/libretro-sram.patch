@@ -1,0 +1,91 @@
+--- a/bsnes/sfc/cartridge/cartridge.hpp
++++ b/bsnes/sfc/cartridge/cartridge.hpp
+@@ -16,6 +16,7 @@
+ 
+   ReadableMemory rom;
+   WritableMemory ram;
++  Memory* batteryRAM = nullptr;
+ 
+   struct Information {
+     uint pathID = 0;
+--- a/bsnes/sfc/cartridge/cartridge.cpp
++++ b/bsnes/sfc/cartridge/cartridge.cpp
+@@ -49,6 +49,7 @@
+ }
+ 
+ auto Cartridge::load() -> bool {
++  batteryRAM = nullptr;
+   information = {};
+   has = {};
+   game = {};
+@@ -154,6 +155,7 @@
+ }
+ 
+ auto Cartridge::unload() -> void {
++  batteryRAM = nullptr;
+   rom.reset();
+   ram.reset();
+ }
+--- a/bsnes/sfc/cartridge/load.cpp
++++ b/bsnes/sfc/cartridge/load.cpp
+@@ -121,6 +121,7 @@
+     ram.allocate(memory->size);
+     if(memory->type == "RAM" && !memory->nonVolatile) return;
+     if(memory->type == "RTC" && !memory->nonVolatile) return;
++    if(memory->name() == "save.ram") batteryRAM = &ram;
+     if(auto fp = platform->open(pathID(), memory->name(), File::Read, required)) {
+       fp->read(ram.data(), min(fp->size(), ram.size()));
+     }
+--- a/bsnes/target-libretro/libretro.cpp
++++ b/bsnes/target-libretro/libretro.cpp
+@@ -2,7 +2,7 @@
+ #include "libretro.h"
+ #include "libretro_core_options.h"
+ #include <emulator/emulator.hpp>
+-#include <sfc/interface/interface.hpp>
++#include <sfc/sfc.hpp>
+ #include "program.h"
+ 
+ retro_environment_t environ_cb;
+@@ -1034,14 +1034,14 @@
+ 	return program->superFamicom.region == "NTSC" ? RETRO_REGION_NTSC : RETRO_REGION_PAL;
+ }
+ 
+-// Currently, there is no safe/sensible way to use the memory interface without severe hackery.
+-// Rely on higan to load and save SRAM until there is really compelling reason not to.
+ void *retro_get_memory_data(unsigned id)
+ {
+-	return nullptr;
++	auto* ram = SuperFamicom::cartridge.batteryRAM;
++	return id == RETRO_MEMORY_SAVE_RAM && ram ? ram->data() : nullptr;
+ }
+ 
+ size_t retro_get_memory_size(unsigned id)
+ {
+-	return 0;
+-}
++	auto* ram = SuperFamicom::cartridge.batteryRAM;
++	return id == RETRO_MEMORY_SAVE_RAM && ram ? ram->size() : 0;
++}
+--- a/bsnes/target-libretro/program.cpp
++++ b/bsnes/target-libretro/program.cpp
+@@ -501,18 +501,7 @@
+ 		return vfs::fs::file::open({Location::notsuffix(superFamicom.location), name}, mode);
+ 	}
+ 	else if (name == "save.ram") {
+-		string save_path;
+-
+-		auto suffix = Location::suffix(base_name);
+-		auto base = Location::base(base_name.transform("\\", "/"));
+-
+-		const char *save = nullptr;
+-		if (environ_cb && environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &save) && save)
+-			save_path = { string(save).transform("\\", "/"), "/", base.trimRight(suffix, 1L), ".srm" };
+-		else
+-			save_path = { base_name.trimRight(suffix, 1L), ".srm" };
+-
+-		return vfs::libretro::file::open(save_path, mode);
++		return {};
+ 	}
+ 	else if (name == "time.rtc") {
+ 		string time_path;

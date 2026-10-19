@@ -1,0 +1,43 @@
+--- a/src/core/hle/service/cecd/cecd.cpp
++++ b/src/core/hle/service/cecd/cecd.cpp
+@@ -107,13 +107,14 @@
+             rb.Push(Result(ErrorDescription::NoData, ErrorModule::CEC, ErrorSummary::NotFound,
+                            ErrorLevel::Status));
+             rb.Push<u32>(0); // No file size
++            session_data->file.reset();
+         } else {
+             session_data->file = std::move(file_result).Unwrap();
+             rb.Push(ResultSuccess);
+             rb.Push<u32>(static_cast<u32>(session_data->file->GetSize())); // Return file size
+         }
+ 
+-        if (path_type == CecDataPathType::MboxProgramId) {
++        if (path_type == CecDataPathType::MboxProgramId && session_data->file) {
+             std::vector<u8> program_id(8);
+             u64_le le_program_id = cecd->system.Kernel().GetCurrentProcess()->codeset->program_id;
+             std::memcpy(program_id.data(), &le_program_id, sizeof(u64));
+@@ -157,6 +158,12 @@
+         rb.Push<u32>(0); // No bytes read
+         break;
+     default: // If not directory, then it is a file
++        if (!session_data->file) {
++            rb.Push(Result(ErrorDescription::NoData, ErrorModule::CEC, ErrorSummary::NotFound,
++                           ErrorLevel::Status));
++            rb.Push<u32>(0); // No bytes read
++            break;
++        }
+         std::vector<u8> buffer(write_buffer_size);
+         const u32 bytes_read = static_cast<u32>(
+             session_data->file->Read(0, write_buffer_size, buffer.data()).Unwrap());
+@@ -361,6 +368,11 @@
+                        ErrorLevel::Status));
+         break;
+     default: // If not directory, then it is a file
++        if (!session_data->file) {
++            rb.Push(Result(ErrorDescription::NoData, ErrorModule::CEC, ErrorSummary::NotFound,
++                           ErrorLevel::Status));
++            break;
++        }
+         std::vector<u8> buffer(read_buffer_size);
+         read_buffer.Read(buffer.data(), 0, read_buffer_size);
+ 

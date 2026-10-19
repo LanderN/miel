@@ -1,0 +1,17 @@
+{
+  "project": "bsnes",
+  "version": "115",
+  "source_commit": "05439f96121d2b9d7ad7a5fc1f29d7eebdcc8c43",
+  "release_url": "https://github.com/libretro/bsnes-libretro/commit/05439f96121d2b9d7ad7a5fc1f29d7eebdcc8c43",
+  "android_abi": "arm64-v8a",
+  "source_url": "https://github.com/libretro/bsnes-libretro/archive/05439f96121d2b9d7ad7a5fc1f29d7eebdcc8c43.tar.gz",
+  "source_sha256": "c32b646544eae0ec2fd467f32ee9b05d0b19d9af4fc8df9c73fa43f1f915812f",
+  "android_ndk": "29.0.14206865",
+  "license": "GPL-3.0-or-later; see upstream source for dependency notices",
+  "license_copy": "android/app/src/main/assets/notices/bsnes-license.txt",
+  "notes": "Built with upstream Android.mk as libbsnes_libretro.so. The SRAM patch exposes cartridge save RAM through the libretro memory API; the frontend owns its persistence. No firmware or ROMs bundled.",
+  "build_system": "ndk",
+  "build_subdir": "bsnes/target-libretro",
+  "android_mk": "bsnes/target-libretro/jni/Android.mk",
+  "git_version": ""
+}

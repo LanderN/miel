@@ -1,0 +1,27 @@
+/.claude/worktrees/
+/.tools
+/artifacts/
+/scratchpad/
+/internal/
+**/.gradle/
+**/build/
+**/jniLibs/
+**/local.properties
+*.apk
+.DS_Store
+
+# Signing keys and game files
+*.jks
+*.keystore
+*.p12
+*.pfx
+**/keystore.properties
+**/signing.properties
+*.3ds
+*.3dsx
+*.cci
+*.cia
+*.cxi
+*.z3dsx
+*.zcci
+*.zcxi

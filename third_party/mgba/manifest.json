@@ -1,0 +1,13 @@
+{
+  "project": "mGBA",
+  "version": "0.10.5",
+  "release_url": "https://github.com/mgba-emu/mgba/releases/tag/0.10.5",
+  "android_abi": "arm64-v8a",
+  "source_url": "https://github.com/mgba-emu/mgba/archive/refs/tags/0.10.5.tar.gz",
+  "source_sha256": "91d6fbd32abcbdf030d58d3f562de25ebbc9d56040d513ff8e5c19bee9dacf14",
+  "android_ndk": "29.0.14206865",
+  "android_cmake": "3.30.3",
+  "license": "MPL-2.0; see upstream source for per-file and dependency notices",
+  "license_copy": "android/app/src/main/assets/notices/mgba-0.10.5-license.txt",
+  "notes": "Built from the release source as the libretro core only, for Game Boy, Color and Advance, without optional libraries, packaged as libmgba_libretro.so. Uses its high-level BIOS unless gba_bios.bin is in the system folder. No BIOS or ROMs bundled."
+}

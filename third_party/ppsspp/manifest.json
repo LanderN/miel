@@ -1,0 +1,12 @@
+{
+  "project": "PPSSPP",
+  "version": "1.20.4",
+  "release_url": "https://github.com/hrydgard/ppsspp/releases/tag/v1.20.4",
+  "source_url": "https://github.com/hrydgard/ppsspp/releases/download/v1.20.4/ppsspp-1.20.4.tar.xz",
+  "source_sha256": "4de21db3105d9d81a465a8a7e78c68ee3c0e0bf6597d1c1d530f7555f3ad8b31",
+  "android_ndk": "29.0.14206865",
+  "android_cmake": "3.30.3",
+  "license": "GPL-2.0-or-later; see source for dependency and font licenses",
+  "license_copy": "android/app/src/main/assets/notices/ppsspp-1.20.4-license.txt",
+  "notes": "Built from the official complete source release with bundled FFmpeg decoders, ARM64 JIT and OpenGL ES. Runtime assets are packaged separately and extracted to a private versioned system directory. In-game saves use a per-game memory stick; PSP/SAVEDATA archives sync with RomM. The libretro patch reports serialization readiness after asynchronous boot and drains queued GPU frames while pausing."
+}

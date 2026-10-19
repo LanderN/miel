@@ -1,0 +1,22 @@
+{
+  "project": "Azahar",
+  "version": "2126.2",
+  "source_commit": "219d743a1e698101fe1ab8bef43e6563126c3c27",
+  "release_url": "https://github.com/azahar-emu/azahar/releases/tag/2126.2",
+  "android_abi": "arm64-v8a",
+  "source_url": "https://github.com/azahar-emu/azahar/releases/download/2126.2/azahar-unified-source-2126.2.tar.xz",
+  "source_sha256": "85c8b56fac703df04720125044b8ff887997911858a6cde545dfb1107ba4cd26",
+  "patches": [
+    "patches/0001-libretro-vfs-write-count.patch",
+    "patches/0002-cecd-null-file.patch",
+    "patches/0003-libretro-vfs-append-mode.patch",
+    "patches/0004-libretro-clock-resync.patch",
+    "patches/0005-libretro-depth-state.patch",
+    "patches/0006-libretro-frame-rate.patch"
+  ],
+  "android_ndk": "29.0.14206865",
+  "android_cmake": "3.30.3",
+  "license": "GPL-2.0-or-later; see upstream source for per-file and dependency notices",
+  "license_copy": "android/app/src/main/assets/notices/azahar-2126.2-license.txt",
+  "notes": "Built from the pinned release source with the listed patches and upstream's libretro Android CMake options, packaged as libazahar_libretro.so. Reports library_version 2126.2, as the official release core does. Core statically links its C++ runtime. No firmware, keys, NAND, game data or ROMs bundled. Clock resync ports the shared-page changes from martyfuhry/azahar clock-resync-v3 (45c7d2cdd), adapted to libretro resume and checkpoint loading."
+}

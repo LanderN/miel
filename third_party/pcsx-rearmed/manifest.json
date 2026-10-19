@@ -1,0 +1,17 @@
+{
+  "project": "PCSX-ReARMed",
+  "version": "r26 c8816799",
+  "source_commit": "c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "release_url": "https://github.com/libretro/pcsx_rearmed/tree/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "android_abi": "arm64-v8a",
+  "source_url": "https://codeload.github.com/libretro/pcsx_rearmed/tar.gz/c8816799b50388e61cfe237fe2cdbb7d8175f20a",
+  "source_sha256": "edeb21fdeef8815521cb9d4488d2cd35746607c968ca9b26cce4e42c09f2dc99",
+  "android_ndk": "29.0.14206865",
+  "license": "GPL-2.0-or-later; see upstream source for per-file and dependency notices",
+  "license_copy": "android/app/src/main/assets/notices/pcsx-rearmed-r26-license.txt",
+  "notes": "Built with upstream jni/Android.mk for arm64, with CHD support, the software NEON GPU, ARM64 dynamic recompiler and a pinned GIT_VERSION, packaged as libpcsx_rearmed_libretro.so. Reports library_version r26 c8816799. The archive includes its libretro and CHD dependencies; the unused libpicofe submodule is not required. Uses its high-level BIOS unless a supported PlayStation BIOS dump is in the system folder. No BIOS, firmware, game data or ROMs bundled.",
+  "build_system": "ndk",
+  "build_subdir": "jni",
+  "android_mk": "jni/Android.mk",
+  "git_version": " c8816799"
+}

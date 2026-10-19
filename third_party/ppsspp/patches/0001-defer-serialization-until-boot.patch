@@ -1,0 +1,28 @@
+--- a/libretro/libretro.cpp
++++ b/libretro/libretro.cpp
+@@ -1475,11 +1475,9 @@
+ 
+       emuThreadState = EmuThreadState::PAUSE_REQUESTED;
+ 
+-      // Is this safe?
+-      ctx->ThreadFrame(true); // Eat 1 frame
+-
+-      while (emuThreadState != EmuThreadState::PAUSED)
+-         sleep_ms(1, "libretro-pause-poll");
++      ctx->ThreadFrameUntilCondition([]() -> bool {
++         return emuThreadState == EmuThreadState::PAUSED;
++      });
+    }
+ 
+ } // namespace Libretro
+@@ -1799,8 +1797,8 @@
+ 
+ size_t retro_serialize_size(void)
+ {
+-   if (!gpu) // The HW renderer isn't ready on first pass.
+-      return 134217728; // 128MB ought to be enough for anybody.
++   if (g_pendingBoot || !gpu)
++      return 0;
+ 
+    SaveState::SaveStart state;
+    // TODO: Libretro API extension to use the savestate queue

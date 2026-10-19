@@ -1,0 +1,38 @@
+--- a/src/citra_libretro/environment.cpp
++++ b/src/citra_libretro/environment.cpp
+@@ -8,6 +8,7 @@
+ #include "audio_core/libretro_sink.h"
+ #include "common/scm_rev.h"
+ #include "core/3ds.h"
++#include "core/core_timing.h"
+ #include "core_settings.h"
+ #include "emu_window/libretro_window.h"
+ #include "environment.h"
+@@ -303,7 +304,7 @@
+ }
+ 
+ void retro_get_system_av_info(struct retro_system_av_info* info) {
+-    info->timing.fps = 60.0;
++    info->timing.fps = SCREEN_REFRESH_RATE;
+     info->timing.sample_rate = AudioCore::native_sample_rate;
+ 
+     // Compute geometry from current settings so the frontend allocates the
+--- a/src/citra_libretro/emu_window/libretro_window.cpp
++++ b/src/citra_libretro/emu_window/libretro_window.cpp
+@@ -14,6 +14,7 @@
+ #include "citra_libretro/input/input_factory.h"
+ #include "common/settings.h"
+ #include "core/3ds.h"
++#include "core/core_timing.h"
+ #ifdef ENABLE_OPENGL
+ #include "video_core/renderer_opengl/gl_state.h"
+ #endif
+@@ -300,7 +301,7 @@
+ 
+     // Update Libretro with our status
+     struct retro_system_av_info info{};
+-    info.timing.fps = 60.0;
++    info.timing.fps = SCREEN_REFRESH_RATE;
+     info.timing.sample_rate = AudioCore::native_sample_rate;
+     info.geometry.aspect_ratio = (float)baseX / (float)baseY;
+     info.geometry.base_width = baseX;

@@ -1,0 +1,284 @@
+--- a/src/core/hle/kernel/shared_page.cpp
++++ b/src/core/hle/kernel/shared_page.cpp
+@@ -1,4 +1,4 @@
+-// Copyright 2015 Citra Emulator Project
++// Copyright 2015-2026 Citra Emulator Project / Azahar Emulator Project
+ // Licensed under GPLv2 or any later version
+ // Refer to the license.txt file included.
+ 
+@@ -8,6 +8,7 @@
+ #include <boost/serialization/binary_object.hpp>
+ #include "common/archives.h"
+ #include "common/assert.h"
++#include "common/logging/log.h"
+ #include "common/settings.h"
+ #include "core/core.h"
+ #include "core/core_timing.h"
+@@ -31,32 +32,44 @@
+ 
+ namespace SharedPage {
+ 
+-static std::chrono::seconds GetInitTime(u64 override_init_time) {
++// Host time as seen by a console booted with InitClock::SystemTime (DST hour and offset applied)
++static std::chrono::milliseconds GetHostInitTime() {
++    auto now = std::chrono::system_clock::now();
++    // If the system time is in daylight saving, we give an additional hour to console time
++    std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
++    std::tm* now_tm = std::localtime(&now_time_t);
++    if (now_tm && now_tm->tm_isdst > 0)
++        now = now + std::chrono::hours(1);
++
++    // add the offset
++    s64 init_time_offset = Settings::values.init_time_offset.GetValue();
++    long long days_offset = init_time_offset / 86400;
++    long long days_offset_in_seconds = days_offset * 86400; // h/m/s truncated
++    unsigned long long seconds_offset =
++        std::abs(init_time_offset) - std::abs(days_offset_in_seconds);
++
++    now = now + std::chrono::seconds(seconds_offset);
++    now = now + std::chrono::seconds(days_offset_in_seconds);
++    return std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
++}
++
++/// Time the emulated console has been running, base ticks included
++static std::chrono::milliseconds GetEmulatedTime(const Core::Timing& timing) {
++    return std::chrono::duration_cast<std::chrono::milliseconds>(timing.GetGlobalTimeUs());
++}
++
++/// The system clock at emulated time zero; a movie override takes precedence over the setting
++static std::chrono::seconds GetInitTime(const Core::Timing& timing, u64 override_init_time) {
+     if (override_init_time != 0) {
+         // Override the clock init time with the one in the movie
+         return std::chrono::seconds(override_init_time);
+     }
+ 
+     switch (Settings::values.init_clock.GetValue()) {
+-    case Settings::InitClock::SystemTime: {
+-        auto now = std::chrono::system_clock::now();
+-        // If the system time is in daylight saving, we give an additional hour to console time
+-        std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+-        std::tm* now_tm = std::localtime(&now_time_t);
+-        if (now_tm && now_tm->tm_isdst > 0)
+-            now = now + std::chrono::hours(1);
+-
+-        // add the offset
+-        s64 init_time_offset = Settings::values.init_time_offset.GetValue();
+-        long long days_offset = init_time_offset / 86400;
+-        long long days_offset_in_seconds = days_offset * 86400; // h/m/s truncated
+-        unsigned long long seconds_offset =
+-            std::abs(init_time_offset) - std::abs(days_offset_in_seconds);
+-
+-        now = now + std::chrono::seconds(seconds_offset);
+-        now = now + std::chrono::seconds(days_offset_in_seconds);
+-        return std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch());
+-    }
++    case Settings::InitClock::SystemTime:
++        // Subtract the base ticks or restored session uptime.
++        return std::chrono::duration_cast<std::chrono::seconds>(GetHostInitTime() -
++                                                                GetEmulatedTime(timing));
+     case Settings::InitClock::FixedTime:
+         return std::chrono::seconds(Settings::values.init_time.GetValue());
+     default:
+@@ -64,7 +77,8 @@
+     }
+ }
+ 
+-Handler::Handler(Core::Timing& timing, u64 override_init_time) : timing(timing) {
++Handler::Handler(Core::Timing& timing, u64 override_init_time)
++    : timing(timing), override_init_time(override_init_time) {
+     std::memset(&shared_page, 0, sizeof(shared_page));
+ 
+     shared_page.running_hw = 0x1; // product
+@@ -78,7 +92,10 @@
+     shared_page.battery_state.is_adapter_connected.Assign(1);
+     shared_page.battery_state.is_charging.Assign(1);
+ 
+-    init_time = GetInitTime(override_init_time);
++    init_time = GetInitTime(timing, override_init_time);
++    boot_init_time = init_time;
++    boot_host_time = GetHostInitTime();
++    boot_emulated_time = GetEmulatedTime(timing);
+ 
+     using namespace std::placeholders;
+     update_time_event = timing.RegisterEvent("SharedPage::UpdateTimeCallback",
+@@ -125,9 +142,79 @@
+     return 3155673600000ULL + GetSystemTimeSince2000();
+ }
+ 
++bool Handler::ResyncWithHostClock() {
++    if (override_init_time != 0) {
++        // Movie playback and recording must stay deterministic
++        return false;
++    }
++    if (Settings::values.init_clock.GetValue() != Settings::InitClock::SystemTime) {
++        // The clock was configured to be independent of the host
++        return false;
++    }
++
++    // Ticks stop while paused, so since boot the host clock has gained exactly the missed time on
++    // the emulated clock. Subtract what earlier resyncs already added to init_time.
++    const auto host_elapsed = GetHostInitTime() - boot_host_time;
++    const auto emulated_elapsed = GetEmulatedTime(timing) - boot_emulated_time;
++    const auto applied = init_time - boot_init_time;
++    const auto deficit = host_elapsed - emulated_elapsed - applied;
++    // Whole seconds only; the remainder is carried over to the next resync
++    const auto missed = std::chrono::duration_cast<std::chrono::seconds>(deficit);
++
++    if (missed <= std::chrono::seconds::zero()) {
++        // In step with or ahead of the host; the clock never moves backwards, as on hardware
++        LOG_DEBUG(Kernel, "Clock resync skipped, deficit is {} ms", deficit.count());
++        return false;
++    }
++
++    init_time += missed;
++
++    // Publish a fresh DateTime reference now, as PTM does when the console wakes
++    PublishDateTime();
++
++    LOG_INFO(Kernel, "Advanced system clock by {} s to resync with host", missed.count());
++    return true;
++}
++
++void Handler::OnSavestateLoaded() {
++    if (override_init_time != 0 ||
++        Settings::values.init_clock.GetValue() != Settings::InitClock::SystemTime) {
++        // Fixed and movie clocks were restored exactly, so the saved reference is still right
++        return;
++    }
++
++    // The clock the game would still read from the saved reference, for the log only
++    const DateTime& saved = CurrentDateTime();
++    const u64 elapsed_ticks = timing.GetTicks() - saved.update_tick;
++    const u64 saved_ms = saved.date_time + elapsed_ticks * 1000 / BASE_CLOCK_RATE_ARM11;
++    const s64 delta_s =
++        (static_cast<s64>(GetSystemTimeSince1900()) - static_cast<s64>(saved_ms)) / 1000;
++
++    PublishDateTime();
++
++    LOG_INFO(Kernel,
++             "Savestate loaded, system clock set to host time ({:+} s from the saved clock)",
++             delta_s);
++}
++
++void Handler::PublishDateTime() {
++    // UpdateTimeCallback re-arms the hourly event removed here
++    timing.RemoveEvent(update_time_event);
++    UpdateTimeCallback(0, 0);
++}
++
++// The DateTime reference is double-buffered: the low bit of date_time_counter says which slot the
++// game reads, the OS writes the other one and then bumps the counter
++const DateTime& Handler::CurrentDateTime() const {
++    return shared_page.date_time_counter % 2 ? shared_page.date_time_1 : shared_page.date_time_0;
++}
++
++DateTime& Handler::NextDateTime() {
++    return shared_page.date_time_counter % 2 ? shared_page.date_time_0 : shared_page.date_time_1;
++}
++
+ void Handler::UpdateTimeCallback(std::uintptr_t user_data, int cycles_late) {
+-    DateTime& date_time =
+-        shared_page.date_time_counter % 2 ? shared_page.date_time_0 : shared_page.date_time_1;
++    DateTime& date_time = NextDateTime();
+ 
+     date_time.date_time = GetSystemTimeSince1900();
+     date_time.update_tick = timing.GetTicks();
+--- a/src/core/hle/kernel/shared_page.h
++++ b/src/core/hle/kernel/shared_page.h
+@@ -1,4 +1,4 @@
+-// Copyright 2015-2025 Citra Emulator Project / Azahar Emulator Project
++// Copyright 2015-2026 Citra Emulator Project / Azahar Emulator Project
+ // Licensed under GPLv2 or any later version
+ // Refer to the license.txt file included.
+ 
+@@ -91,6 +91,7 @@
+ 
+ class Handler : public BackingMem {
+ public:
++    /// System clocks anchor to host time at boot and state restore.
+     Handler(Core::Timing& timing, u64 override_init_time);
+ 
+     void SetMacAddress(const MacAddress&);
+@@ -127,11 +128,28 @@
+     /// Gets the system time in milliseconds since the year 1900.
+     u64 GetSystemTimeSince1900() const;
+ 
++    /// Advance a system clock after a pause, on the emulation thread.
++    bool ResyncWithHostClock();
++
++    /// Publish host time after deserialization unlocks the event queue.
++    void OnSavestateLoaded();
++
+ private:
+     void UpdateTimeCallback(std::uintptr_t user_data, int cycles_late);
++    /// Replaces the pending hourly update with an immediate DateTime publish
++    void PublishDateTime();
++    /// The DateTime reference the game currently reads
++    const DateTime& CurrentDateTime() const;
++    /// The DateTime slot the next publish writes
++    DateTime& NextDateTime();
+     Core::Timing& timing;
+     Core::TimingEventType* update_time_event;
+     std::chrono::seconds init_time;
++    u64 override_init_time{};
++    /// Sampled together at boot; ResyncWithHostClock() measures every correction against these
++    std::chrono::milliseconds boot_host_time{};
++    std::chrono::milliseconds boot_emulated_time{};
++    std::chrono::seconds boot_init_time{};
+ 
+     SharedPageDef shared_page;
+ 
+--- a/src/citra_libretro/citra_libretro.cpp
++++ b/src/citra_libretro/citra_libretro.cpp
+@@ -2,6 +2,7 @@
+ // Licensed under GPLv2 or any later version
+ // Refer to the license.txt file included.
+ 
++#include <chrono>
+ #include <list>
+ #include <numeric>
+ #include <vector>
+@@ -47,6 +48,7 @@
+ #include "core/hle/kernel/kernel.h"
+ #include "core/hle/kernel/memory.h"
+ #include "core/hle/kernel/process.h"
++#include "core/hle/kernel/shared_page.h"
+ #include "core/loader/loader.h"
+ #include "core/memory.h"
+ 
+@@ -62,6 +64,7 @@
+     std::unique_ptr<EmuWindow_LibRetro> emu_window;
+     bool game_loaded = false;
+     bool first_run_loop = true;
++    std::chrono::system_clock::time_point last_frame_time{};
+     struct retro_hw_render_callback hw_render{};
+ };
+ 
+@@ -221,7 +224,14 @@
+         LibRetro::PollInput();
+         LibRetro::UploadVideoFrame(nullptr, 0, 0, 0);
+         return;
++    }
++
++    const auto now = std::chrono::system_clock::now();
++    if (!emu_instance->first_run_loop && Core::System::GetInstance().KernelRunning() &&
++        now - emu_instance->last_frame_time > std::chrono::seconds(1)) {
++        Core::System::GetInstance().Kernel().GetSharedPageHandler().ResyncWithHostClock();
+     }
++    emu_instance->last_frame_time = now;
+ 
+     // Check to see if we actually have any config updates to process.
+     if (LibRetro::HasUpdatedConfig()) {
+@@ -730,7 +740,11 @@
+ 
+     std::vector<u8> buffer(static_cast<const u8*>(data), static_cast<const u8*>(data) + size);
+     try {
+-        return system.LoadStateBuffer(std::move(buffer));
++        if (!system.LoadStateBuffer(std::move(buffer)))
++            return false;
++        system.Kernel().GetSharedPageHandler().OnSavestateLoaded();
++        emu_instance->last_frame_time = std::chrono::system_clock::now();
++        return true;
+     } catch (const std::exception& e) {
+         LOG_ERROR(Frontend, "Error loading state: {}", e.what());
+         return false;

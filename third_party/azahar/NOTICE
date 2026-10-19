@@ -1,0 +1,10 @@
+RTC synchronization
+
+The shared-page RTC changes in patches/0004-libretro-clock-resync.patch
+are adapted from martyfuhry's clock-resync-v3 work, with libretro integration
+for miel.
+
+Author: https://github.com/martyfuhry
+Source: https://github.com/martyfuhry/azahar/releases/tag/clock-resync-v3
+Commit: 45c7d2cdd
+License: GPL-2.0-or-later

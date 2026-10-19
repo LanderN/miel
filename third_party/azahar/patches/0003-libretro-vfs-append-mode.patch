@@ -1,0 +1,24 @@
+--- a/src/common/file_util.cpp
++++ b/src/common/file_util.cpp
+@@ -1395,6 +1395,11 @@
+ #else
+     m_file = FOPEN(filename.c_str(), openmode.c_str());
+     m_good = m_file != nullptr;
++#if defined(HAVE_LIBRETRO_VFS)
++    // rfopen positions append streams at the end; stdio reads them from the beginning.
++    if (m_good && openmode.find('a') != std::string::npos)
++        FSEEK(m_file, 0, SEEK_SET);
++#endif
+ #endif
+ 
+     return m_good;
+@@ -1527,6 +1532,9 @@
+ 
+     std::size_t written;
+ #if defined(HAVE_LIBRETRO_VFS)
++    // Like stdio append streams, write at the end whatever the read position.
++    if (openmode.find('a') != std::string::npos)
++        FSEEK(m_file, 0, SEEK_END);
+     written = rfwrite(data, elem_size, length, m_file);
+ #else
+     written = std::fwrite(data, elem_size, length, m_file);
