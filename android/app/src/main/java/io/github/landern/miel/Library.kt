@@ -180,7 +180,7 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
     val apps = session.tab == Tab.APPS
     val total = if (apps) session.apps.size else session.order.size
     val position = if (apps) session.appSelected else session.position
-    Box(Modifier.fillMaxSize().background(Miel.background)) {
+    Box(Modifier.fillMaxSize().background(Miel.background).surfaceTexture(SurfaceTexture.Paper)) {
         Column(
             Modifier.fillMaxSize().padding(Miel.margin),
             verticalArrangement = Arrangement.spacedBy(Miel.gap),
@@ -694,6 +694,7 @@ private fun RowScope.Pill(
                     .padding(bottom = lip)
                     .offset(y = sink)
                     .background(face, shape)
+                    .surfaceTexture(SurfaceTexture.Satin, shape)
                     .border(
                         1.dp,
                         when {
@@ -780,6 +781,7 @@ private fun KeyHint(key: String, onClick: () -> Unit) {
                         if (pressed) Miel.pressed else Color(0xFFFFFCF5),
                         RoundedCornerShape(7.dp),
                     )
+                    .surfaceTexture(SurfaceTexture.Satin, RoundedCornerShape(7.dp))
                     .border(1.dp, Color(0xFFE3CFA8), RoundedCornerShape(7.dp)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -826,7 +828,13 @@ private fun Segmented(
                         tween(110),
                     )
                 Box(
-                    Modifier.fillMaxSize().background(background, RoundedCornerShape(15.dp)),
+                    Modifier.fillMaxSize()
+                        .background(background, RoundedCornerShape(15.dp))
+                        .then(
+                            if (i == current || pressed)
+                                Modifier.surfaceTexture(SurfaceTexture.Satin, RoundedCornerShape(15.dp))
+                            else Modifier,
+                        ),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -918,7 +926,10 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
                     options.indices,
             )
     Column(
-        Modifier.fillMaxSize().background(Miel.background).padding(Miel.margin),
+        Modifier.fillMaxSize()
+            .background(Miel.background)
+            .surfaceTexture(SurfaceTexture.Paper)
+            .padding(Miel.margin),
         verticalArrangement = Arrangement.spacedBy(Miel.gap),
     ) {
         Text(core?.coreName ?: "Settings", color = Miel.ink, size = 28.sp, weight = FontWeight.Bold)
