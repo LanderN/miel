@@ -166,13 +166,13 @@ class ArtworkCache(
             if (source.startsWith("content:")) {
                 fetchSource(directory, game, kind, source, request)
                 false
+            } else if (recentMiss(directory, game, kind, source)) {
+                false
             } else if (source.isNotEmpty()) {
                 val recorded = File(directory, stem(game.id, kind) + ".source.txt")
                 !(paths.containsKey("$kind:${game.id}") && recorded.isFile && recorded.readText() == source)
             } else {
-                val miss = File(directory, stem(game.id, kind) + ".miss")
-                !paths.containsKey("$kind:${game.id}") && game.system.isNotEmpty() &&
-                    !(miss.exists() && System.currentTimeMillis() - miss.lastModified() < DAY)
+                !paths.containsKey("$kind:${game.id}") && game.system.isNotEmpty()
             }
         }
         if (pending.isEmpty() || !current(request)) return
@@ -196,7 +196,6 @@ class ArtworkCache(
                     if (tried.add(key)) listings[key] = listing(directory, game.system, kind)
                     val name = match(listings[key], game)
                     if (name == null) {
-                        File(directory, stem(game.id, kind) + ".miss").writeBytes(ByteArray(0))
                         false
                     } else {
                         val source = LibretroArt.imageUrl(game.system, kind, name)
@@ -212,7 +211,12 @@ class ArtworkCache(
                 Log.w(TAG, "No artwork for ${game.id}", error)
                 false
             }
-            if (success) downloaded++
+            if (success) {
+                downloaded++
+                Files.deleteIfExists(File(directory, stem(game.id, kind) + ".miss").toPath())
+            } else if (current(request) && !Thread.currentThread().isInterrupted) {
+                File(directory, stem(game.id, kind) + ".miss").writeText(missSource(game, supplied))
+            }
         }
         val missing = pending.size - downloaded
         show(MielNotification(
@@ -222,6 +226,16 @@ class ArtworkCache(
             unavailableFraction = missing.toFloat() / pending.size,
         ))
     }
+
+    private fun recentMiss(directory: File, game: Game, kind: String, source: String): Boolean {
+        val miss = File(directory, stem(game.id, kind) + ".miss")
+        return miss.isFile &&
+            System.currentTimeMillis() - miss.lastModified() < DAY &&
+            miss.readText() == missSource(game, source)
+    }
+
+    private fun missSource(game: Game, source: String): String =
+        if (source.isNotEmpty()) source else "${game.system}\n${game.romFilename}\n${game.region}"
 
     private companion object {
         const val TAG = "MielArtwork"
