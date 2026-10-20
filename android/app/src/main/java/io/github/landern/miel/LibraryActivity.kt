@@ -43,6 +43,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 
 /**
@@ -263,6 +264,14 @@ class LibraryActivity : ComponentActivity() {
         if (
             session.menu &&
                 !session.confirm &&
+                (command == Command.UploadRom || command == Command.PreviousTab)
+        ) {
+            session.game?.takeIf { it.deletable && it.rommId == 0 }?.let(::uploadRom)
+            return
+        }
+        if (
+            session.menu &&
+                !session.confirm &&
                 (command == Command.DeleteRom || command == Command.NextTab)
         ) {
             session.game
@@ -376,7 +385,10 @@ class LibraryActivity : ComponentActivity() {
                     Command.B,
                     Command.Select -> {
                         if (overlay.core != null && !overlay.perGame) {
-                            this.overlay = Overlay.Settings(selected = 5 + overlay.core.ordinal)
+                            this.overlay =
+                                Overlay.Settings(
+                                    selected = CORE_SETTINGS_START + overlay.core.ordinal,
+                                )
                             sounds.play(Cue.BACK)
                         } else close()
                     }
@@ -429,6 +441,7 @@ class LibraryActivity : ComponentActivity() {
             is Overlay.RomMPairing -> if (command == Command.B) close()
             is Overlay.RomMPaired ->
                 when (command) {
+                    Command.Y -> pair(overlay.server)
                     Command.X -> {
                         romm.forget()
                         close()
@@ -488,7 +501,7 @@ class LibraryActivity : ComponentActivity() {
     }
 
     private fun settingChosen(choice: Int) {
-        Core.entries.getOrNull(choice - 5)?.let {
+        Core.entries.getOrNull(choice - CORE_SETTINGS_START)?.let {
             overlay = Overlay.Settings(core = it)
             sounds.play(Cue.OPEN)
             return
@@ -505,6 +518,21 @@ class LibraryActivity : ComponentActivity() {
             "Rescan folder" ->
                 if (library.tree().isEmpty() && !romm.paired) chooseFolder() else rescan()
             "Scan report" -> showMessage("Scan report", library.report())
+            "Redownload metadata" -> {
+                if (library.busy()) return showMessage("Finding your games", library.report())
+                showMessage("Redownloading metadata", "Refreshing metadata and artwork…")
+                artwork.clear { removed ->
+                    images.evictAll()
+                    if (removed) {
+                        this.overlay = null
+                        rescan()
+                    } else
+                        showMessage(
+                            "Redownload metadata",
+                            "Cached artwork could not be cleared. Try again.",
+                        )
+                }
+            }
             "Remove downloaded art" -> {
                 showMessage("Removing downloaded art", "Removing cached covers and screenshots…")
                 artwork.clear { removed ->
@@ -527,6 +555,45 @@ class LibraryActivity : ComponentActivity() {
                     "Licenses",
                     assets.open("notices/overview.txt").bufferedReader().use { it.readText() },
                 )
+        }
+    }
+
+    private fun uploadRom(game: Game) {
+        if (!romm.paired) {
+            overlay = Overlay.RomMAddress()
+            return
+        }
+        session.command(Command.B)
+        showMessage("Uploading to RomM", "${game.title} · 0%")
+        work = lifecycleScope.launch {
+            try {
+                runInterruptible(Dispatchers.IO) {
+                    var last = -1
+                    romm.upload(game) { progress ->
+                        val percent = (progress * 100).toInt()
+                        if (percent != last) {
+                            last = percent
+                            runOnUiThread {
+                                if (work?.isActive == true)
+                                    overlay =
+                                        Overlay.Message(
+                                            "Uploading to RomM",
+                                            "${game.title} · $percent%",
+                                        )
+                            }
+                        }
+                    }
+                }
+                showMessage("Uploaded to RomM", "Scan the library in RomM, then rescan in miel.")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                val message =
+                    if (error is RomM.Refused && error.status == 403)
+                        "RomM upload permission is missing. Pair with RomM again."
+                    else error.message ?: "The upload failed."
+                showMessage("Upload to RomM", message)
+            }
         }
     }
 

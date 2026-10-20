@@ -246,7 +246,7 @@ class RomLibrary(
                 Log.w("MielLibrary", "RomM unreachable", error)
                 show(MielNotification("Metadata update failed", "RomM unavailable · Kept saved metadata",
                     "Finished", 1f, finished = true, warning = true))
-                scan.romm = "RomM was unreachable; its games are from the last scan."
+                scan.romm = "RomM update failed: ${error.message.orEmpty()}. Kept saved metadata."
                 val links = games.filter { it.rommId != 0 }.associateBy { it.id }
                 scan.found.replaceAll { game -> links[game.id]?.let(game::linked) ?: game }
                 scan.found.addAll(games.filter { it.romUri.startsWith(RomM.URI) })

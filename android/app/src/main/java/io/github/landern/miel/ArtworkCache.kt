@@ -166,7 +166,7 @@ class ArtworkCache(
             if (source.startsWith("content:")) {
                 fetchSource(directory, game, kind, source, request)
                 false
-            } else if (recentMiss(directory, game, kind, source)) {
+            } else if (hasMiss(directory, game, kind, source)) {
                 false
             } else if (source.isNotEmpty()) {
                 val recorded = File(directory, stem(game.id, kind) + ".source.txt")
@@ -227,11 +227,9 @@ class ArtworkCache(
         ))
     }
 
-    private fun recentMiss(directory: File, game: Game, kind: String, source: String): Boolean {
+    private fun hasMiss(directory: File, game: Game, kind: String, source: String): Boolean {
         val miss = File(directory, stem(game.id, kind) + ".miss")
-        return miss.isFile &&
-            System.currentTimeMillis() - miss.lastModified() < DAY &&
-            miss.readText() == missSource(game, source)
+        return miss.isFile && miss.readText() == missSource(game, source)
     }
 
     private fun missSource(game: Game, source: String): String =

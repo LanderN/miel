@@ -128,9 +128,12 @@ val SETTINGS =
         "Rescan folder",
         "Scan report",
         "RomM",
+        "Redownload metadata",
     ) +
         Core.entries.map { it.coreName } +
         listOf("Remove downloaded art", "Set as default launcher", "miel updates", "Licenses")
+
+const val CORE_SETTINGS_START = 6
 
 /** A dialog over the library that is not part of the session. */
 sealed interface Overlay {
@@ -516,6 +519,21 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
                     modifier,
                     contentScale = ContentScale.Crop,
                 )
+            if (game.rommId != 0) {
+                Box(
+                    Modifier.padding(Miel.spaceSm)
+                        .background(Miel.background.copy(alpha = .94f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(
+                        "RomM",
+                        color = Miel.keyInk,
+                        size = 10.sp,
+                        weight = FontWeight.SemiBold,
+                        lines = 1,
+                    )
+                }
+            }
             if (cover?.boxart != true && session.gameRows != 1) {
                 // A box cover names the game; other art takes the title.
                 Box(
@@ -915,6 +933,13 @@ private fun More(session: Session, command: (Command) -> Unit) {
                 Pill("Y", "Emulator settings", primary = false, fill = true) { command(Command.Y) }
             }
         }
+        if (!confirm && session.game?.let { it.deletable && it.rommId == 0 } == true) {
+            Row(Modifier.fillMaxWidth()) {
+                Pill("L", "Upload to RomM", primary = false, fill = true) {
+                    command(Command.UploadRom)
+                }
+            }
+        }
         if (!confirm && session.game?.deletable == true) {
             Row(Modifier.fillMaxWidth()) {
                 Pill("R", "Delete ROM", destructive = true, fill = true) {
@@ -959,9 +984,9 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
     val groups =
         if (core == null)
             listOf(
-                "Library" to 0..4,
-                "Emulators" to (5 until 5 + Core.entries.size),
-                "Device & storage" to (5 + Core.entries.size..SETTINGS.lastIndex),
+                "Library" to (0 until CORE_SETTINGS_START),
+                "Emulators" to (CORE_SETTINGS_START until CORE_SETTINGS_START + Core.entries.size),
+                "Device & storage" to (CORE_SETTINGS_START + Core.entries.size..SETTINGS.lastIndex),
             )
         else
             listOf(
@@ -1270,6 +1295,9 @@ private fun RomMPaired(overlay: Overlay.RomMPaired, command: (Command) -> Unit) 
             color = Miel.muted,
             size = Miel.textBody,
         )
+        Row(Modifier.fillMaxWidth()) {
+            Pill("Y", "Pair again", primary = false, fill = true) { command(Command.Y) }
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Miel.inset)) {
             Pill("X", "Unpair", primary = false, destructive = true, fill = true) {
                 command(Command.X)
