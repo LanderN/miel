@@ -142,6 +142,8 @@ sealed interface Overlay {
 
     data class SaveAccess(val game: Game) : Overlay
 
+    data class DeleteRom(val game: Game) : Overlay
+
     data class Update(val text: String, val action: String? = null) : Overlay
 
     data class Message(
@@ -262,6 +264,7 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
             is Overlay.Message -> Message(overlay, command)
             is Overlay.Update -> Update(overlay, command)
             is Overlay.SaveAccess -> SaveAccess(command)
+            is Overlay.DeleteRom -> DeleteRom(overlay, command)
             is Overlay.RomMAddress -> RomMAddress(overlay, command)
             is Overlay.RomMPairing -> RomMPairing(overlay, command)
             is Overlay.RomMPaired -> RomMPaired(overlay, command)
@@ -912,6 +915,13 @@ private fun More(session: Session, command: (Command) -> Unit) {
                 Pill("Y", "Emulator settings", primary = false, fill = true) { command(Command.Y) }
             }
         }
+        if (!confirm && session.game?.deletable == true) {
+            Row(Modifier.fillMaxWidth()) {
+                Pill("R", "Delete ROM", destructive = true, fill = true) {
+                    command(Command.DeleteRom)
+                }
+            }
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Miel.inset)) {
             Pill("B", "Cancel", primary = false, fill = true) { command(Command.B) }
             Pill(
@@ -922,6 +932,22 @@ private fun More(session: Session, command: (Command) -> Unit) {
             ) {
                 command(Command.A)
             }
+        }
+    }
+}
+
+@Composable
+private fun DeleteRom(overlay: Overlay.DeleteRom, command: (Command) -> Unit) {
+    Dialog("Delete ROM?") {
+        Text(overlay.game.romFilename, color = Miel.ink, size = Miel.textBody)
+        Text(
+            "Permanently deletes this file. Saves are kept.",
+            color = Miel.muted,
+            size = Miel.textBody,
+        )
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Miel.inset)) {
+            Pill("B", "Cancel", primary = false, fill = true) { command(Command.B) }
+            Pill("A", "Delete ROM", destructive = true, fill = true) { command(Command.A) }
         }
     }
 }

@@ -66,6 +66,8 @@ sealed interface Command {
 
     object Y : Command
 
+    object DeleteRom : Command
+
     /** A library tab was touched. */
     data class ChooseTab(val tab: Tab) : Command
 

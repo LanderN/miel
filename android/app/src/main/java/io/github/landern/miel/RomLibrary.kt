@@ -56,6 +56,9 @@ data class Game(
     val core: Core?
         get() = Core.of(platform)
 
+    val deletable: Boolean
+        get() = core != null && romUri.startsWith("content://")
+
     val playable: Boolean
         get() =
             DroidDeck.isGame(this) || (romUri.isNotEmpty() && core?.accepts(romFilename) == true)
@@ -156,6 +159,55 @@ class RomLibrary(
                 publish(games)
             } finally {
                 scanning.set(false)
+            }
+        }
+    }
+
+    /** Deletes the selected local document; saves and companion files stay in place. */
+    fun delete(game: Game, completed: (String?) -> Unit) {
+        if (!game.deletable) return completed("This game has no local ROM file.")
+        if (!scanning.compareAndSet(false, true))
+            return completed("Wait for the folder scan to finish.")
+        worker.execute {
+            var deleted = false
+            var error: String? = null
+            try {
+                if (games.none { it.id == game.id && it.romUri == game.romUri }) {
+                    throw IOException("This ROM is no longer in the library.")
+                }
+                val uri = Uri.parse(game.romUri)
+                val mime =
+                    context.contentResolver
+                        .query(uri, arrayOf(Document.COLUMN_MIME_TYPE), null, null, null)
+                        ?.use { if (it.moveToFirst()) it.getString(0) else null }
+                if (mime == null || mime == Document.MIME_TYPE_DIR) {
+                    throw IOException("The ROM file is unavailable.")
+                }
+                if (!DocumentsContract.deleteDocument(context.contentResolver, uri)) {
+                    throw IOException("The folder provider could not delete this ROM.")
+                }
+                deleted = true
+                val remaining = Scan(null)
+                remaining.found.addAll(games.filterNot { it.romUri == game.romUri })
+                games = remaining.found.toList()
+                save(remaining)
+            } catch (failure: Exception) {
+                Log.w("MielLibrary", "Deleting ROM failed", failure)
+                error =
+                    when {
+                        deleted -> "ROM deleted, but the library could not be saved."
+                        failure is SecurityException ->
+                            "Choose the ROM folder again to allow deleting files."
+                        else -> failure.message ?: "The ROM could not be deleted."
+                    }
+            } finally {
+                scanning.set(false)
+                main.post {
+                    if (!closed) {
+                        if (deleted) changed(games)
+                        completed(error)
+                    }
+                }
             }
         }
     }

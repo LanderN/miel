@@ -95,7 +95,11 @@ class LibraryActivity : ComponentActivity() {
 
     private val folderPicker =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            result.data?.data?.takeIf { result.resultCode == RESULT_OK }?.let(::folderChosen)
+            result.data
+                ?.takeIf { result.resultCode == RESULT_OK }
+                ?.let { data ->
+                    data.data?.let { folderChosen(it, data.flags) }
+                }
         }
     private val savePermission =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
@@ -256,6 +260,19 @@ class LibraryActivity : ComponentActivity() {
                 else -> {}
             }
         }
+        if (
+            session.menu &&
+                !session.confirm &&
+                (command == Command.DeleteRom || command == Command.NextTab)
+        ) {
+            session.game
+                ?.takeIf { it.deletable }
+                ?.let {
+                    overlay = Overlay.DeleteRom(it)
+                    sounds.play(Cue.OPEN)
+                }
+            return
+        }
         if (command == Command.Y && session.menu && !session.confirm) {
             session.game?.core?.let { overlay = Overlay.Settings(core = it, perGame = true) }
             sounds.play(Cue.OPEN)
@@ -366,6 +383,19 @@ class LibraryActivity : ComponentActivity() {
                     else -> {}
                 }
             }
+            is Overlay.DeleteRom ->
+                when (command) {
+                    Command.A -> {
+                        this.overlay = Overlay.Message("Deleting ROM", overlay.game.romFilename)
+                        library.delete(overlay.game) { error ->
+                            this.overlay =
+                                if (error == null) null else Overlay.Message("Delete ROM", error)
+                            sounds.play(if (error == null) Cue.CONFIRM else Cue.ERROR)
+                        }
+                    }
+                    Command.B -> close()
+                    else -> {}
+                }
             is Overlay.SaveAccess ->
                 when (command) {
                     Command.A ->
@@ -808,6 +838,7 @@ class LibraryActivity : ComponentActivity() {
             Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
                 .addFlags(
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
                         Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or
                         Intent.FLAG_GRANT_PREFIX_URI_PERMISSION,
                 )
@@ -821,11 +852,13 @@ class LibraryActivity : ComponentActivity() {
         }
     }
 
-    private fun folderChosen(tree: Uri) {
+    private fun folderChosen(tree: Uri, flags: Int) {
         try {
             contentResolver.takePersistableUriPermission(
                 tree,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                flags and
+                    (Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                        Intent.FLAG_GRANT_WRITE_URI_PERMISSION),
             )
             library.scan(tree)
         } catch (error: SecurityException) {
