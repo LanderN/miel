@@ -72,6 +72,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -95,6 +97,13 @@ private object Miel {
     val control = 44.dp
     val radius = 26.dp
     val tileRadius = 18.dp
+    val font =
+        FontFamily(
+            Font(R.font.nunito_regular, FontWeight.Normal),
+            Font(R.font.nunito_semibold, FontWeight.SemiBold),
+            Font(R.font.nunito_bold, FontWeight.Bold),
+            Font(R.font.nunito_extrabold, FontWeight.ExtraBold),
+        )
     val textSmall = 12.sp
     val textBody = 14.sp
     val background = Color(0xFFFBF7EF)
@@ -355,7 +364,7 @@ private fun ColumnScope.TileGrid(
             (maxWidth - gap * (if (paged) columns else columns - 1)) /
                 (columns + if (paged) 0.3f else 0f)
         val aboveHeight = if (above != null) 24.dp else 0.dp
-        val belowHeight = if (below != null) 56.dp else 0.dp
+        val belowHeight = if (below != null) 72.dp else 0.dp
         val availableHeight = (maxHeight - aboveHeight - belowHeight).coerceAtLeast(1.dp)
         val rowHeight = (availableHeight - gap * (rows - 1)) / rows
         val cellWidth = aspect?.let { minOf(columnWidth, rowHeight * it) } ?: columnWidth
@@ -420,7 +429,9 @@ private fun ColumnScope.TileGrid(
             Box(
                 Modifier.offset(ringX - scrollDp, ringY)
                     .size(cellWidth, cellHeight)
-                    .border(3.dp, Miel.ring, RoundedCornerShape(Miel.tileRadius)),
+                    .border(2.dp, Miel.ring, RoundedCornerShape(Miel.tileRadius))
+                    .padding(2.dp)
+                    .border(1.dp, Miel.background, RoundedCornerShape(Miel.tileRadius - 2.dp)),
             )
         }
     }
@@ -462,8 +473,10 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
                             game.title,
                             color = Miel.ink,
                             size = Miel.textBody,
-                            weight = FontWeight.SemiBold,
-                            lines = 1,
+                            weight = FontWeight.ExtraBold,
+                            lineHeight = 18.sp,
+                            lines = 2,
+                            minLines = 2,
                         )
                         val detail =
                             listOf(if (game.year > 0) "${game.year}" else "", game.genre)
@@ -480,7 +493,7 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
             chosen,
             Color(0xFFF4EFE4),
             Lift(12.dp, 3.dp),
-            Lift(22.dp, 10.dp),
+            Lift(24.dp, 9.dp),
             { command(if (chosen) Command.A else Command.Pick(index)) },
         ) {
             val cover = art.cover(game)
@@ -832,7 +845,10 @@ private fun Segmented(
                         .background(background, RoundedCornerShape(15.dp))
                         .then(
                             if (i == current || pressed)
-                                Modifier.surfaceTexture(SurfaceTexture.Satin, RoundedCornerShape(15.dp))
+                                Modifier.surfaceTexture(
+                                    SurfaceTexture.Satin,
+                                    RoundedCornerShape(15.dp),
+                                )
                             else Modifier,
                         ),
                     contentAlignment = Alignment.Center,
@@ -1263,6 +1279,7 @@ private fun Text(
     letterSpacing: TextUnit = TextUnit.Unspecified,
     lineHeight: TextUnit = TextUnit.Unspecified,
     lines: Int = Int.MAX_VALUE,
+    minLines: Int = 1,
 ) {
     androidx.compose.foundation.text.BasicText(
         text,
@@ -1271,11 +1288,13 @@ private fun Text(
             color = color,
             fontSize = size,
             fontWeight = weight,
+            fontFamily = Miel.font,
             textAlign = align,
             letterSpacing = letterSpacing,
             lineHeight = lineHeight,
         ),
         overflow = TextOverflow.Ellipsis,
         maxLines = lines,
+        minLines = minLines,
     )
 }

@@ -10,7 +10,6 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Shader
-import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
@@ -40,6 +39,8 @@ class HeroView(context: Context) : View(context) {
     private val artPaint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val shade = Paint()
     private val bounds = RectF()
+    private val titleFace = context.resources.getFont(R.font.nunito_extrabold)
+    private val detailFace = context.resources.getFont(R.font.nunito_regular)
     private val cache = LruCache<String, Bitmap>(4)
     private val fade = ValueAnimator.ofFloat(0f, 1f).setDuration(300)
     private var decoder: ExecutorService? = null
@@ -107,8 +108,8 @@ class HeroView(context: Context) : View(context) {
                 0f,
                 0f,
                 height.toFloat(),
-                intArrayOf(0x003f3024, 0xdf3f3024.toInt()),
-                null,
+                intArrayOf(0x00211c15, 0x55211c15, 0xee211c15.toInt()),
+                floatArrayOf(.32f, .58f, 1f),
                 Shader.TileMode.CLAMP,
             )
     }
@@ -177,7 +178,7 @@ class HeroView(context: Context) : View(context) {
         if (alpha <= 0) return
         val x = 24 * scale
         val opacity = (255 * alpha).toInt()
-        paint.typeface = TITLE
+        paint.typeface = titleFace
         paint.color = 0xfffdfaf3.toInt()
         paint.alpha = opacity
         paint.textSize = 32 * scale
@@ -198,7 +199,7 @@ class HeroView(context: Context) : View(context) {
         canvas.translate(x, height - 60 * scale - title.height + offset)
         title.draw(canvas)
         canvas.restore()
-        paint.typeface = DETAIL
+        paint.typeface = detailFace
         paint.color = 0xffe5d6bc.toInt()
         paint.alpha = opacity
         paint.textSize = 14 * scale
@@ -208,8 +209,6 @@ class HeroView(context: Context) : View(context) {
     }
 
     companion object {
-        private val TITLE = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-        private val DETAIL = Typeface.create("sans-serif", Typeface.NORMAL)
         private val BACKGROUND = Color.rgb(63, 48, 36)
         private val EMPTY = Hero("", "", "")
 

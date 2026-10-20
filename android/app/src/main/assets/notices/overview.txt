@@ -22,7 +22,7 @@ PPSSPP — GPL-2.0-or-later
 FFmpeg — LGPL-2.1-or-later for the bundled configuration
 libretro API header — MIT
 AndroidX and ZXing — Apache-2.0
-Inconsolata and Roboto — SIL Open Font License 1.1
+Inconsolata, Roboto and Nunito — SIL Open Font License 1.1
 
 mGBA source is available under MPL-2.0 in the release source archive and at https://github.com/mgba-emu/mgba .
 
