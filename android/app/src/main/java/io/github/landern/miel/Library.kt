@@ -205,7 +205,7 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
                 Modifier.fillMaxWidth().height(Miel.control),
                 horizontalArrangement = Arrangement.spacedBy(Miel.spaceSm),
             ) {
-                if (total > 0) {
+                if (total > 0 && (apps || session.game?.let(DroidDeck::isGame) != true)) {
                     Pill(
                         "X",
                         if (apps) session.appScreen.other().label else "More",
@@ -242,6 +242,7 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
                             apps -> "Open"
                             total == 0 && session.games.isNotEmpty() -> "Browse games"
                             total == 0 -> "Choose ROM folder"
+                            session.game?.let(DroidDeck::isGame) == true -> "Play"
                             session.launched -> "Continue"
                             else -> "Play"
                         },

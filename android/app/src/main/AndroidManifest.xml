@@ -11,6 +11,7 @@
 
     <!-- The Apps tab lists every launcher activity. -->
     <queries>
+        <package android:name="com.droiddeck.launcher" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />

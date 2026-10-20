@@ -57,7 +57,8 @@ data class Game(
         get() = Core.of(platform)
 
     val playable: Boolean
-        get() = romUri.isNotEmpty() && core?.accepts(romFilename) == true
+        get() =
+            DroidDeck.isGame(this) || (romUri.isNotEmpty() && core?.accepts(romFilename) == true)
 }
 
 /**
@@ -304,6 +305,7 @@ class RomLibrary(
                 ?: throw IOException("Folder provider returned no result")
         val siblings = HashMap<String, String>()
         val folderGames = ArrayList<Game>()
+        var imageDirectory = ""
         cursor.use {
             while (cursor.moveToNext()) {
                 if (closed) throw InterruptedIOException()
@@ -315,6 +317,7 @@ class RomLibrary(
                     continue
                 }
                 if (cursor.getString(2) == Document.MIME_TYPE_DIR) {
+                    if (name == "images") imageDirectory = id
                     visit(scan, id, "$folder/$name", depth + 1)
                     continue
                 }
@@ -327,18 +330,60 @@ class RomLibrary(
                 }
                 if (!scan.seen.add("file:$id")) continue
                 if (scan.found.size >= MAX_GAMES) throw IOException("Folder exceeds 5,000 games")
+                val entry =
+                    if (platform == DroidDeck.PLATFORM) {
+                        val uri = DocumentsContract.buildDocumentUriUsingTree(tree, id)
+                        val gameId =
+                            try {
+                                context.contentResolver.openInputStream(uri)?.use(DroidDeck::readId)
+                            } catch (error: IOException) {
+                                Log.w("MielLibrary", "Cannot read DroidDeck export $name", error)
+                                null
+                            }
+                        if (gameId == null) {
+                            scan.skipped++
+                            continue
+                        }
+                        if (!scan.seen.add("droiddeck:$gameId")) continue
+                        DroidDeck.game(gameId, name)
+                    } else game(tree, id, name, platform)
                 val found =
-                    game(tree, id, name, platform)
-                        .copy(
-                            romDirectory =
-                                DocumentsContract.buildDocumentUriUsingTree(tree, document)
-                                    .toString(),
-                        )
+                    entry.copy(
+                        romDirectory =
+                            DocumentsContract.buildDocumentUriUsingTree(tree, document).toString(),
+                    )
                 scan.found.add(found)
                 folderGames.add(found)
             }
         }
-        for (game in folderGames) {
+        val icons = HashMap<String, String>()
+        if (imageDirectory.isNotEmpty() && folderGames.any(DroidDeck::isGame)) {
+            val uri = DocumentsContract.buildChildDocumentsUriUsingTree(tree, imageDirectory)
+            context.contentResolver.query(uri, columns, null, null, null)?.use { images ->
+                while (images.moveToNext()) {
+                    if (++scan.entries > MAX_ENTRIES)
+                        throw IOException("Folder exceeds 20,000 entries")
+                    val name = images.getString(1) ?: continue
+                    icons[name] =
+                        DocumentsContract.buildDocumentUriUsingTree(tree, images.getString(0))
+                            .toString()
+                }
+            }
+        }
+        for (original in folderGames) {
+            val game =
+                if (DroidDeck.isGame(original)) {
+                    val stem = DroidDeck.iconStem(original.romFilename)
+                    val icon =
+                        if (stem.isEmpty()) ""
+                        else
+                            listOf("jpg", "jpeg", "png", "webp")
+                                .firstNotNullOfOrNull { icons["$stem-icon.$it"] }
+                                .orEmpty()
+                    original.copy(cover = icon).also {
+                        scan.found[scan.found.indexOf(original)] = it
+                    }
+                } else original
             scan.metadata[game.id] = LocalMetadata.read(context, game, siblings)
         }
     }
@@ -422,4 +467,3 @@ class RomLibrary(
                 .put("rom_directory", game.romDirectory)
     }
 }
-

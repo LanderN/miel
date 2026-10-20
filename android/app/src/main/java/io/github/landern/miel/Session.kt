@@ -30,6 +30,7 @@ enum class Tab(val label: String, val platform: String? = null) {
     SNES("SNES", "SNES"),
     PSX("PSX", "PlayStation"),
     PSP("PSP", "PSP"),
+    PC("PC", DroidDeck.PLATFORM),
     APPS("Apps"),
 }
 
@@ -348,7 +349,7 @@ class Session(private val path: File) {
         if (appScreen != screen) changeDisk { it.copy(screens = it.screens + (app.id to screen)) }
     }
 
-    /** Closes More and marks the selected game as the most recent, once the core runs it. */
+    /** Closes More and records the selected game in launch order. */
     fun recordLaunch() {
         closeMenu()
         val game = game ?: return
@@ -411,7 +412,7 @@ class Session(private val path: File) {
             adjusting && command == Command.Y ->
                 changeSettings { it.copy(hardwareShaders = !it.hardwareShaders) }
             !menu && command is Command.Pick && command.index in order -> selected = command.index
-            command == Command.X -> {
+            command == Command.X && game?.let(DroidDeck::isGame) != true -> {
                 menu = !menu
                 confirm = false
             }

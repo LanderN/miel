@@ -116,7 +116,7 @@ class LibraryActivity : ComponentActivity() {
         artwork = ArtworkCache(applicationContext) { artworkVersion++ }
         library =
             RomLibrary(applicationContext) { scanned ->
-                // The library lists only the games the embedded core runs.
+                // The library lists embedded games and DroidDeck exports.
                 val games = scanned.filter { it.playable }
                 session.replaceGames(games)
                 artwork.update(games)
@@ -209,7 +209,14 @@ class LibraryActivity : ComponentActivity() {
                     listOf(game.platform, if (game.year > 0) "${game.year}" else "", game.genre)
                         .filter { it.isNotEmpty() }
                         .joinToString(" · ")
-                Hero(game.title, detail, artwork.heroPath(game.id))
+                val hero = artwork.heroPath(game.id)
+                val icon = hero.isEmpty() && DroidDeck.isGame(game)
+                Hero(
+                    game.title,
+                    detail,
+                    if (icon) artwork.coverPath(game.id) else hero,
+                    icon = icon,
+                )
             } ?: Hero(if (session.games.isEmpty()) "No games" else "No recent games", "", "")
         }
     }
@@ -261,6 +268,7 @@ class LibraryActivity : ComponentActivity() {
         if (command == Command.A && session.tab != Tab.APPS) {
             val game = session.game ?: return
             if (!game.playable) return fail(UNPLAYABLE)
+            if (DroidDeck.isGame(game)) return openDroidDeck(game)
             if (!session.menu || session.confirm) return syncAndStart(game)
         }
         if (
@@ -932,6 +940,26 @@ class LibraryActivity : ComponentActivity() {
             return fail("Android could not open ${app.label}.")
         }
         session.rememberScreen(screen)
+        sounds.play(Cue.CONFIRM)
+    }
+
+    private fun openDroidDeck(game: Game) {
+        val intent =
+            Intent(Intent.ACTION_VIEW, Uri.parse(game.romUri))
+                .setClassName(DroidDeck.PACKAGE, "${DroidDeck.PACKAGE}.MainActivity")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            startActivity(
+                intent,
+                ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY).toBundle(),
+            )
+        } catch (error: android.content.ActivityNotFoundException) {
+            return fail("Install DroidDeck to play this game.")
+        } catch (error: RuntimeException) {
+            Log.w(Displays.TAG, "Opening DroidDeck failed", error)
+            return fail("Android could not open DroidDeck.")
+        }
+        session.recordLaunch()
         sounds.play(Cue.CONFIRM)
     }
 

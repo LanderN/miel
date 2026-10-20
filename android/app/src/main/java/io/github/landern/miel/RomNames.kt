@@ -26,6 +26,7 @@ object RomNames {
             "zcci",
             "cxi",
             "zcxi" -> "Nintendo 3DS"
+            "steam" -> DroidDeck.PLATFORM
             "nds" -> "Nintendo DS"
             "gba" -> "Game Boy Advance"
             "gb" -> "Game Boy"
