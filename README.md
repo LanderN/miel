@@ -94,6 +94,23 @@ In-game saves live under `/sdcard/miel/saves/PPSSPP/<game>/PSP/SAVEDATA/`.
 Home and Back save a checkpoint for automatic resume. RomM syncs each game’s in-game saves
 as a ZIP containing its `PSP/SAVEDATA` folder.
 
+## PC games with DroidDeck
+
+Install and set up [DroidDeck](https://github.com/Droid-Deck/DroidDeck), then install your games there.
+
+1. Export DroidDeck's game files into a subfolder of miel's selected ROM folder, such as `PC/`.
+2. Keep the exported `.steam` files and their accompanying `images/` folder together.
+3. In miel, choose **Settings → Rescan folder**. Your games appear under **PC**; press **A** to
+   launch one through DroidDeck on the upper screen.
+
+Steam games get portrait covers, hero artwork, release years and genres directly from Steam,
+without an API key. Downloaded artwork and metadata stay cached; unsuccessful requests are tried
+once until **Settings → Redownload metadata** retries them. Non-Steam exports use DroidDeck's
+exported icon. [Local sidecar files](docs/local-metadata.md) can override metadata and artwork.
+
+DroidDeck manages PC game compatibility, settings and saves. miel's embedded checkpoints and
+RomM save sync do not apply to these games.
+
 ## Controls
 
 | Button | In the library |

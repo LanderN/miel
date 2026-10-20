@@ -11,9 +11,6 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
-import java.io.InterruptedIOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
@@ -23,7 +20,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Box covers and gameplay screenshots from local sidecars, RomM and Libretro's thumbnail server,
+ * Box covers and gameplay screenshots from local sidecars, Steam, RomM and Libretro's thumbnail server,
  * kept in files/artwork/libretro-v1. Cached images are published before any request; downloads run
  * one at a time on a background thread, covers first.
  */
@@ -122,7 +119,7 @@ class ArtworkCache(
                     context.contentResolver.openInputStream(Uri.parse(source))?.use {
                         readImage(it)
                     } ?: throw IOException("Cannot open local artwork")
-                } else fetch(source, IMAGE_LIMIT)
+                } else fetchBytes(source, IMAGE_LIMIT)
             val file = cacheImage(directory, game.id, kind, game.system, source, bytes)
             if (current(request)) {
                 paths["$kind:${game.id}"] = file.absolutePath
@@ -270,7 +267,7 @@ class ArtworkCache(
             kind: String,
             system: String,
             source: String,
-        ): File = cacheImage(directory, id, kind, system, source, fetch(source, IMAGE_LIMIT))
+        ): File = cacheImage(directory, id, kind, system, source, fetchBytes(source, IMAGE_LIMIT))
 
         private fun cacheImage(
             directory: File,
@@ -365,7 +362,7 @@ class ArtworkCache(
                 return LibretroArt.filenames(index.readText())
             }
             try {
-                val html = String(fetch(LibretroArt.listingUrl(system, kind), LISTING_LIMIT))
+                val html = String(fetchBytes(LibretroArt.listingUrl(system, kind), LISTING_LIMIT))
                 if (LibretroArt.filenames(html).isEmpty()) {
                     throw IOException("Empty thumbnail listing")
                 }
@@ -376,33 +373,6 @@ class ArtworkCache(
             } catch (error: IOException) {
                 if (index.exists()) return LibretroArt.filenames(index.readText())
                 throw error
-            }
-        }
-
-        fun fetch(url: String, limit: Int): ByteArray {
-            val connection = URL(url).openConnection() as HttpURLConnection
-            connection.connectTimeout = 6000
-            connection.readTimeout = 6000
-            connection.setRequestProperty("User-Agent", "miel/0.1")
-            connection.instanceFollowRedirects = false
-            try {
-                if (connection.responseCode != 200) {
-                    throw IOException("HTTP " + connection.responseCode)
-                }
-                connection.inputStream.use { input ->
-                    val output = ByteArrayOutputStream()
-                    val buffer = ByteArray(8192)
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count == -1) break
-                        if (Thread.currentThread().isInterrupted) throw InterruptedIOException()
-                        if (output.size() + count > limit) throw IOException("Response too large")
-                        output.write(buffer, 0, count)
-                    }
-                    return output.toByteArray()
-                }
-            } finally {
-                connection.disconnect()
             }
         }
     }

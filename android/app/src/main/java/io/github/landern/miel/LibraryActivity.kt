@@ -524,6 +524,7 @@ class LibraryActivity : ComponentActivity() {
                 artwork.clear { removed ->
                     images.evictAll()
                     if (removed) {
+                        DroidDeck.clearMetadata(this)
                         this.overlay = null
                         rescan()
                     } else

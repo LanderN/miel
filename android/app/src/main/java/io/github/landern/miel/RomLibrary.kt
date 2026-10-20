@@ -432,7 +432,7 @@ class RomLibrary(
                             listOf("jpg", "jpeg", "png", "webp")
                                 .firstNotNullOfOrNull { icons["$stem-icon.$it"] }
                                 .orEmpty()
-                    original.copy(cover = icon).also {
+                    DroidDeck.metadata(context, DroidDeck.artwork(original, icon)).also {
                         scan.found[scan.found.indexOf(original)] = it
                     }
                 } else original
