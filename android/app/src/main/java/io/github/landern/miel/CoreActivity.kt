@@ -531,10 +531,12 @@ class CoreActivity : Activity() {
     }
 
     private fun showStatus(info: JSONObject) {
+        val loadingMessage = info.optString("loadingMessage")
         val text =
             when {
                 diagnostic -> "HOST TEST · " + info.optString("message")
                 closing -> KEEPING
+                loadingMessage.isNotEmpty() -> loadingMessage
                 info.optBoolean("ready") -> ""
                 started -> "Getting your game ready…"
                 else -> stagingStatus
@@ -546,7 +548,9 @@ class CoreActivity : Activity() {
         status.visibility = if (text.isEmpty()) View.INVISIBLE else View.VISIBLE
         val progress =
             when {
-                closing || started -> LoadingOverlay.PULSE
+                closing -> LoadingOverlay.PULSE
+                loadingMessage.isNotEmpty() -> info.optDouble("loadingProgress", -1.0).toFloat()
+                started -> LoadingOverlay.PULSE
                 stagingFailed -> LoadingOverlay.NONE
                 else -> stagingProgress
             }

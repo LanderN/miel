@@ -1,0 +1,76 @@
+--- a/src/video_core/renderer_vulkan/vk_pipeline_cache.cpp
++++ b/src/video_core/renderer_vulkan/vk_pipeline_cache.cpp
+@@ -3,6 +3,10 @@
+ // Refer to the license.txt file included.
+ 
+ #include <boost/container/static_vector.hpp>
++
++#ifdef HAVE_LIBRETRO
++#include "citra_libretro/environment.h"
++#endif
+ 
+ #include "common/common_paths.h"
+ #include "common/file_util.h"
+@@ -152,8 +156,15 @@
+ 
+ void PipelineCache::LoadCache(const std::atomic_bool& stop_loading,
+                               const VideoCore::DiskResourceLoadCallback& callback) {
++#ifdef HAVE_LIBRETRO
++    LibRetro::DisplayLoadingMessage("Compiling shaders…");
++#endif
+     LoadDriverPipelineDiskCache(stop_loading, callback);
+     LoadDiskCache(stop_loading, callback);
++    pipeline_workers.WaitForRequests();
++#ifdef HAVE_LIBRETRO
++    LibRetro::DisplayLoadingMessage("");
++#endif
+ }
+ 
+ void PipelineCache::SwitchCache(u64 title_id, const std::atomic_bool& stop_loading,
+@@ -184,7 +195,14 @@
+     LoadDriverPipelineDiskCache(stop_loading, nullptr);
+ 
+     // Switch the disk shader cache after driver cache is switched
++#ifdef HAVE_LIBRETRO
++    LibRetro::DisplayLoadingMessage("Compiling shaders…");
++#endif
+     SwitchDiskCache(title_id, stop_loading, callback);
++    pipeline_workers.WaitForRequests();
++#ifdef HAVE_LIBRETRO
++    LibRetro::DisplayLoadingMessage("");
++#endif
+ }
+ 
+ void PipelineCache::LoadDriverPipelineDiskCache(
+--- a/src/citra_libretro/environment.h
++++ b/src/citra_libretro/environment.h
+@@ -118,6 +118,9 @@
+ /// Displays the specified message to the screen.
+ bool DisplayMessage(const char* sg);
+ 
++/// Reports the current loading stage to the frontend.
++bool DisplayLoadingMessage(const char* text);
++
+ /// Sets serialization quirks for the core.
+ bool SetSerializationQuirks(uint64_t quirks);
+ 
+--- a/src/citra_libretro/environment.cpp
++++ b/src/citra_libretro/environment.cpp
+@@ -174,6 +174,17 @@
+     return environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &msg);
+ }
+ 
++bool DisplayLoadingMessage(const char* text) {
++    retro_message_ext message{};
++    message.msg = text;
++    message.duration = 1000;
++    message.level = RETRO_LOG_INFO;
++    message.target = RETRO_MESSAGE_TARGET_OSD;
++    message.type = RETRO_MESSAGE_TYPE_STATUS;
++    message.progress = -1;
++    return environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE_EXT, &message);
++}
++
+ bool SetSerializationQuirks(uint64_t quirks) {
+     return environ_cb(RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS, &quirks);
+ }

@@ -15,6 +15,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -63,6 +64,7 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
         status.textSize = 14f
         status.gravity = Gravity.CENTER
         status.setLineSpacing(0f, 1.2f)
+        status.accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE
         val statusArea = LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT)
         statusArea.topMargin = (8 * dp).roundToInt()
         column.addView(status, statusArea)
@@ -84,9 +86,9 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
      * Shows `text` with a progress fraction, PULSE or NONE. An empty text fades the overlay out.
      */
     fun update(text: String, progress: Float) {
-        if (text.isNotEmpty()) status.text = text
+        if (text.isNotEmpty() && status.text.toString() != text) status.text = text
         bar.visibility = if (progress.isNaN()) GONE else VISIBLE
-        bar.progress = progress
+        bar.progress = if (progress >= 0) progress.coerceAtMost(1f) else PULSE
         bar.invalidate()
         val show = text.isNotEmpty()
         if (show == shown) return
@@ -106,6 +108,25 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val rect = RectF()
         var progress = PULSE
+
+        init {
+            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
+            contentDescription = "Loading progress"
+        }
+
+        override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
+            super.onInitializeAccessibilityNodeInfo(info)
+            info.className = "android.widget.ProgressBar"
+            if (progress >= 0) {
+                info.rangeInfo =
+                    AccessibilityNodeInfo.RangeInfo.obtain(
+                        AccessibilityNodeInfo.RangeInfo.RANGE_TYPE_FLOAT,
+                        0f,
+                        1f,
+                        progress,
+                    )
+            }
+        }
 
         override fun onDraw(canvas: Canvas) {
             val width = width.toFloat()

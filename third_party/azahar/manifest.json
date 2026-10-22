@@ -14,7 +14,8 @@
     "patches/0005-libretro-depth-state.patch",
     "patches/0006-libretro-frame-rate.patch",
     "patches/0007-libretro-async-shaders.patch",
-    "patches/0008-libretro-spirv-options.patch"
+    "patches/0008-libretro-spirv-options.patch",
+    "patches/0009-libretro-pipeline-warmup.patch"
   ],
   "android_ndk": "29.0.14206865",
   "android_cmake": "3.30.3",

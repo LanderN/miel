@@ -122,7 +122,8 @@ std::atomic<uint16_t> rumbleMotors[2]{};
 std::atomic<uint64_t> rumbleRequests{0}, rumblePeak{0};
 
 std::mutex textMutex;  // Guards the strings below.
-std::string message = "Not started", coreName, coreVersion, lastCoreMessage;
+std::string message = "Not started", coreName, coreVersion, lastCoreMessage, loadingMessage;
+double loadingProgress = -1;
 std::string systemPath, saveDirectoryPath;
 std::string root, statePath, sramPath;
 
@@ -165,6 +166,8 @@ std::atomic<bool> audioFlush{false};
 void status(const std::string& text) {
     std::lock_guard lock(textMutex);
     message = text;
+    loadingMessage = ready ? "" : text;
+    loadingProgress = -1;
     __android_log_print(ANDROID_LOG_INFO, kTag, "%s", text.c_str());
 }
 
@@ -676,6 +679,19 @@ bool environment(unsigned command, void* data) {
         case RETRO_ENVIRONMENT_SET_MESSAGE: {
             std::lock_guard lock(textMutex);
             lastCoreMessage = static_cast<retro_message*>(data)->msg;
+            return true;
+        }
+        case RETRO_ENVIRONMENT_GET_MESSAGE_INTERFACE_VERSION:
+            *static_cast<unsigned*>(data) = 1;
+            return true;
+        case RETRO_ENVIRONMENT_SET_MESSAGE_EXT: {
+            if (!data) return true;
+            const auto& notification = *static_cast<retro_message_ext*>(data);
+            if (!ready && notification.type == RETRO_MESSAGE_TYPE_STATUS) {
+                std::lock_guard lock(textMutex);
+                loadingMessage = notification.msg && *notification.msg ? notification.msg : message;
+                loadingProgress = -1;
+            }
             return true;
         }
         case RETRO_ENVIRONMENT_SHUTDOWN:
@@ -1248,6 +1264,12 @@ public:
         return *this;
     }
 
+    Json& add(const char* name, double value) {
+        key(name);
+        body += std::to_string(value);
+        return *this;
+    }
+
     std::string str() const { return "{" + body + "}"; }
 
 private:
@@ -1293,6 +1315,8 @@ extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_start(
     coreName.clear();
     coreVersion.clear();
     lastCoreMessage.clear();
+    loadingMessage.clear();
+    loadingProgress = -1;
     frames = upperFrames = lowerFrames = audioFrames = audioDelivered = inputEvents = glErrors = 0;
     checkpoints = lastSavedFrame = periodicSaves = 0;
     audioDropped = audioUnderruns = 0;
@@ -1414,6 +1438,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_github_landern_miel_CoreHost_report
     {
         std::lock_guard lock(textMutex);
         report.add("message", message).add("core", coreName).add("version", coreVersion);
+        report.add("loadingMessage", loadingMessage).add("loadingProgress", loadingProgress);
     }
     report.add("running", running.load())
         .add("failed", failed.load())

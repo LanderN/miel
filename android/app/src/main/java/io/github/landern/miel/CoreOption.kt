@@ -95,6 +95,28 @@ val Core.settingOptions: List<CoreOption>
                 )
             Core.MELONDS ->
                 listOf(
+                    toggle("melonds_jit_enable", "JIT recompiler", true),
+                    toggle("melonds_jit_fast_memory", "Fast memory", true),
+                    CoreOption(
+                        "melonds_jit_block_size",
+                        "JIT block size",
+                        listOf("1", "4", "8", "16", "32"),
+                        default = "32",
+                    ),
+                    toggle("melonds_threaded_renderer", "Threaded software rendering", true),
+                    CoreOption(
+                        "melonds_slot2_device",
+                        "Slot-2 device",
+                        listOf("auto", "rumble-pak", "expansion-pak"),
+                        listOf("Automatic", "Rumble Pak", "Memory Expansion Pak"),
+                    ),
+                    CoreOption(
+                        "melonds_rumble_intensity",
+                        "Rumble strength",
+                        listOf("0", "13107", "26214", "39321", "52428", "65535"),
+                        listOf("Off", "20%", "40%", "60%", "80%", "100%"),
+                        "65535",
+                    ),
                     CoreOption(
                         "melonds_audio_interpolation",
                         "Audio interpolation",
