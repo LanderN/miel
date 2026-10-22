@@ -52,8 +52,8 @@ jni=android/app/src/$variant/jniLibs/$abi
 rm -rf "$jni"
 mkdir -p "$jni"
 flags=(-std=c++20 -O2 -g -fPIC -shared -static-libstdc++ -Wl,-z,max-page-size=16384 -Ithird_party/libretro)
-"$ndk/${triple}29-clang++" "${flags[@]}" android/core/host.cpp \
-    -landroid -lEGL -lGLESv3 -laaudio -llog -ldl -o "$jni/libmiel_core.so"
+"$ndk/${triple}29-clang++" "${flags[@]}" android/core/host.cpp android/core/vulkan.cpp \
+    -lvulkan -landroid -lEGL -lGLESv3 -laaudio -llog -ldl -o "$jni/libmiel_core.so"
 if [ "$target" != release ]; then
     "$ndk/${triple}29-clang++" "${flags[@]}" android/core/test_core.cpp -lGLESv3 -o "$jni/libmiel_testcore.so"
 fi

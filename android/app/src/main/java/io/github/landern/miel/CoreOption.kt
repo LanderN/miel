@@ -36,6 +36,12 @@ val Core.settingOptions: List<CoreOption>
                     ),
                     toggle("citra_use_hw_shader", "Hardware shaders", true),
                     CoreOption(
+                        "citra_graphics_api",
+                        "Graphics API",
+                        listOf("OpenGL", "Vulkan"),
+                    ),
+                    toggle("citra_async_shader_compilation", "Async shader compilation"),
+                    CoreOption(
                         "citra_language_value",
                         "System language",
                         listOf(

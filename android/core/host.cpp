@@ -1,5 +1,5 @@
-// The libretro host behind CoreHost.java. One worker thread makes every core, EGL and GL call; the
-// JNI functions only set atomics and swap window handles, which the worker picks up between frames.
+// The libretro host behind CoreHost. The worker owns core calls and presentation; JNI queues
+// input and window changes. Vulkan queue access is shared with the core through its queue lock.
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "libretro.h"
+#include "vulkan.h"
 
 namespace {
 
@@ -145,6 +146,9 @@ float lowerInset = 0;
 GLuint framebuffer = 0, texture = 0, depthBuffer = 0;
 unsigned width = 400, height = 480, allocatedWidth = 0, allocatedHeight = 0;
 retro_hw_render_callback hw{};
+VulkanVideo vulkan;
+bool useVulkan = false;
+const retro_hw_render_context_negotiation_interface_vulkan* vkNegotiation = nullptr;
 retro_pixel_format format = RETRO_PIXEL_FORMAT_XRGB8888;
 retro_frame_time_callback frameTime{};
 retro_audio_callback asyncAudio{};
@@ -234,8 +238,14 @@ void updateWindows() {
             if (next) ANativeWindow_acquire(next);
         }
         Output& output = outputs[slot];
-        if (next == output.window) {
+        if (next == output.window && (!useVulkan || !next || vulkan.visible(slot))) {
             if (next) ANativeWindow_release(next);
+            continue;
+        }
+        if (useVulkan) {
+            vulkan.window(slot, next);
+            if (output.window) ANativeWindow_release(output.window);
+            output.window = next;
             continue;
         }
         eglMakeCurrent(display, pbuffer, pbuffer, context);
@@ -255,7 +265,7 @@ void updateWindows() {
             eglMakeCurrent(display, pbuffer, pbuffer, context);
         }
     }
-    dual = outputs[1].surface != EGL_NO_SURFACE;
+    dual = useVulkan ? vulkan.visible(1) : outputs[1].surface != EGL_NO_SURFACE;
 }
 
 // Scales the framebuffer rectangle (x0, y0)-(x1, y1) onto a screen, letterboxed.
@@ -318,11 +328,20 @@ void upload(const void* data, unsigned w, unsigned h, size_t pitch) {
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
 }
 
-// libretro's video callback. Hardware frames have their origin at the bottom left, software
-// frames at the top left. A stacked frame's top half goes up and its bottom screen goes down.
+// libretro's video callback. GLES frames start at the bottom left; Vulkan and software frames
+// start at the top left. A stacked frame's top half goes up and its bottom screen goes down.
 // Single-screen frames go only to the upper display, including during surface recreation.
 void video(const void* data, unsigned w, unsigned h, size_t pitch) {
     if (!data) return;
+    if (useVulkan) {
+        require(data == RETRO_HW_FRAME_BUFFER_VALID, "Vulkan core returned a software frame");
+        uint64_t start = micros();
+        unsigned mask = vulkan.present(w, h, stacked, lowerInset);
+        if (mask & 1) lowerFrames++;
+        if (mask & 2) upperFrames++;
+        presentMicros += micros() - start;
+        return;
+    }
     bool hardware = data == RETRO_HW_FRAME_BUFFER_VALID;
     if (!hardware) upload(data, w, h, pitch);
     int top = hardware ? h : 0, bottom = hardware ? 0 : h, middle = h / 2;
@@ -567,13 +586,41 @@ bool environment(unsigned command, void* data) {
         case RETRO_ENVIRONMENT_GET_CORE_ASSETS_DIRECTORY:
             *static_cast<const char**>(data) = root.c_str();
             return true;
+        case RETRO_ENVIRONMENT_GET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_SUPPORT: {
+            auto* request = static_cast<retro_hw_render_context_negotiation_interface*>(data);
+            request->interface_version =
+                request->interface_type == RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN ? 1
+                                                                                                : 0;
+            return true;
+        }
+        case RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE: {
+            auto* request =
+                static_cast<retro_hw_render_context_negotiation_interface_vulkan*>(data);
+            if (!useVulkan ||
+                request->interface_type != RETRO_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE_VULKAN ||
+                request->interface_version < 1)
+                return false;
+            vkNegotiation = request;
+            return true;
+        }
+        case RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE:
+            if (!useVulkan || !vulkan.interface.device) return false;
+            *static_cast<const retro_hw_render_interface**>(data) =
+                reinterpret_cast<const retro_hw_render_interface*>(&vulkan.interface);
+            return true;
         case RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER:
-            *static_cast<unsigned*>(data) = RETRO_HW_CONTEXT_OPENGLES3;
+            *static_cast<unsigned*>(data) =
+                useVulkan ? RETRO_HW_CONTEXT_VULKAN : RETRO_HW_CONTEXT_OPENGLES3;
             return true;
         case RETRO_ENVIRONMENT_SET_HW_SHARED_CONTEXT:
             return true;
         case RETRO_ENVIRONMENT_SET_HW_RENDER: {
             auto* request = static_cast<retro_hw_render_callback*>(data);
+            if (useVulkan) {
+                if (request->context_type != RETRO_HW_CONTEXT_VULKAN) return false;
+                hw = *request;
+                return true;
+            }
             if (request->context_type != RETRO_HW_CONTEXT_OPENGLES2 &&
                 request->context_type != RETRO_HW_CONTEXT_OPENGLES3 &&
                 request->context_type != RETRO_HW_CONTEXT_OPENGLES_VERSION) {
@@ -600,7 +647,7 @@ bool environment(unsigned command, void* data) {
             }
             width = geometry->base_width;
             height = geometry->base_height;
-            if (context != EGL_NO_CONTEXT) allocateFramebuffer();
+            if (!useVulkan && context != EGL_NO_CONTEXT) allocateFramebuffer();
             return true;
         }
         case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO:
@@ -811,12 +858,20 @@ void cleanup() {
     if (display != EGL_NO_DISPLAY && context != EGL_NO_CONTEXT) {
         eglMakeCurrent(display, pbuffer, pbuffer, context);
     }
+    if (useVulkan) vulkan.idle();
     if (hwStarted && hw.context_destroy) hw.context_destroy();
     hwStarted = false;
     if (hasGame) api.unload_game();
     hasGame = false;
     if (initialized) api.deinit();
     initialized = false;
+    if (useVulkan) {
+        vulkan.cleanup();
+        for (auto& output : outputs) {
+            if (output.window) ANativeWindow_release(output.window);
+            output = {};
+        }
+    }
     if (display != EGL_NO_DISPLAY) {
         if (context != EGL_NO_CONTEXT) eglMakeCurrent(display, pbuffer, pbuffer, context);
         if (framebuffer) glDeleteFramebuffers(1, &framebuffer);
@@ -982,9 +1037,10 @@ void loop(const Launch& launch, double fps) {
             discIndex = disks.get_image_index();
         }
         updateWindows();
-        eglMakeCurrent(display, pbuffer, pbuffer, context);
+        if (!useVulkan) eglMakeCurrent(display, pbuffer, pbuffer, context);
         bool periodic = launch.diagnostic && ready && !paused &&
-                        outputs[0].surface != EGL_NO_SURFACE && Clock::now() >= checkpointDue;
+                        (useVulkan ? vulkan.visible(0) : outputs[0].surface != EGL_NO_SURFACE) &&
+                        Clock::now() >= checkpointDue;
         if (writing.valid() &&
             writing.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             bool ok = writing.get();
@@ -1013,7 +1069,8 @@ void loop(const Launch& launch, double fps) {
         }
         // The bootstrap frames run even while paused or hidden: a Home pressed during loading
         // must never save over a session that has not been restored.
-        if (ready && (paused || outputs[0].surface == EGL_NO_SURFACE)) {
+        if (ready &&
+            (paused || (useVulkan ? !vulkan.visible(0) : outputs[0].surface == EGL_NO_SURFACE))) {
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
             next = Clock::now();
             continue;
@@ -1063,6 +1120,8 @@ void run(const Launch launch) {
         }
         require(coreName == launch.coreName, "Unexpected core identity: " + coreName);
         variables = {launch.options.begin(), launch.options.end()};
+        useVulkan = coreName == "Azahar" && variables["citra_graphics_api"] == "Vulkan";
+        vkNegotiation = nullptr;
         api.set_environment(environment);
         api.set_video_refresh(video);
         api.set_audio_sample(sample);
@@ -1075,11 +1134,11 @@ void run(const Launch launch) {
         if (launch.probe) {
             status(coreName + " " + coreVersion + " initialized; no ROM loaded");
         } else {
-            setupGraphics();
+            if (!useVulkan) setupGraphics();
             if (coreName == "Azahar") {
                 GLint minor = 0;
-                glGetIntegerv(GL_MINOR_VERSION, &minor);
-                if (minor < 2) variables["citra_graphics_api"] = "Software";
+                if (!useVulkan) glGetIntegerv(GL_MINOR_VERSION, &minor);
+                if (!useVulkan && minor < 2) variables["citra_graphics_api"] = "Software";
 #if defined(__aarch64__)
                 // Under binary translation the kernel reports another machine; Azahar's JIT
                 // cannot run there.
@@ -1118,7 +1177,12 @@ void run(const Launch launch) {
             api.get_system_av_info(&av);
             width = av.geometry.base_width;
             height = av.geometry.base_height;
-            allocateFramebuffer();
+            if (useVulkan) {
+                vulkan.setup(vkNegotiation);
+                updateWindows();
+            } else {
+                allocateFramebuffer();
+            }
             if (hw.context_reset) {
                 hw.context_reset();
                 hwStarted = true;
@@ -1134,7 +1198,12 @@ void run(const Launch launch) {
         failed = true;
         status(error.what());
     }
-    cleanup();
+    try {
+        cleanup();
+    } catch (const std::exception& error) {
+        failed = true;
+        status(error.what());
+    }
     if (handle) dlclose(handle);
     running = false;
 }
