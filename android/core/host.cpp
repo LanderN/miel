@@ -1099,7 +1099,8 @@ void loop(const Launch& launch, double fps) {
         runMicros += spent;
         hint.work(spent);
         frames++;
-        if (!ready && frames >= 2 && api.serialize_size() > 0) {
+        // Azahar calculates its state size by taking a full snapshot.
+        if (!ready && frames >= 2 && (coreName == "Azahar" || api.serialize_size() > 0)) {
             restoreSession(launch);
             checkpointDue = Clock::now() + interval;
         }

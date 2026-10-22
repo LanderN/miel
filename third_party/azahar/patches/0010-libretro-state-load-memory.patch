@@ -1,0 +1,36 @@
+--- a/src/core/savestate.cpp
++++ b/src/core/savestate.cpp
+@@ -4,6 +4,8 @@
+ 
+ #include <chrono>
+ #include <sstream>
++#include <boost/iostreams/device/array.hpp>
++#include <boost/iostreams/stream.hpp>
+ #include <cryptopp/hex.h>
+ #include <fmt/ranges.h>
+ #include "common/archives.h"
+@@ -305,16 +307,16 @@
+         return false;
+     }
+ 
+-    std::vector<u8> state(buffer.begin() + sizeof(CSTHeader), buffer.end());
+-    auto decompressed = Common::Compression::DecompressDataZSTD(state);
+-
+-    std::istringstream sstream{
+-        std::string{reinterpret_cast<char*>(decompressed.data()), decompressed.size()},
+-        std::ios_base::binary};
+-    decompressed.clear();
++    auto decompressed = Common::Compression::DecompressDataZSTD(
++        std::span<const u8>{buffer}.subspan(sizeof(CSTHeader)));
++    std::vector<u8>{}.swap(buffer);
++
++    boost::iostreams::array_source source{reinterpret_cast<const char*>(decompressed.data()),
++                                         decompressed.size()};
++    boost::iostreams::stream<boost::iostreams::array_source> stream{source};
+ 
+     // Deserialize
+-    iarchive ia{sstream};
++    iarchive ia{stream};
+     ia&* this;
+ 
+     return true;
