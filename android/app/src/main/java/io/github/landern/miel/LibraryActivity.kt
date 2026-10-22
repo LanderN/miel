@@ -892,6 +892,8 @@ class LibraryActivity : ComponentActivity() {
                 }
             } catch (error: IOException) {
                 null
+            } catch (error: IllegalArgumentException) {
+                null
             }
         return header?.let(AzaharSaves::titleId)?.takeIf { it != 0L }
             ?: game.titleId.toLongOrNull(16)
