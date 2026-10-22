@@ -41,6 +41,13 @@ val Core.settingOptions: List<CoreOption>
                         listOf("OpenGL", "Vulkan"),
                     ),
                     toggle("citra_async_shader_compilation", "Async shader compilation"),
+                    toggle("citra_spirv_shader_gen", "SPIR-V shader generation", true),
+                    CoreOption(
+                        "citra_disable_spirv_optimizer",
+                        "SPIR-V optimization",
+                        listOf("enabled", "disabled"),
+                        listOf("Off", "On"),
+                    ),
                     CoreOption(
                         "citra_language_value",
                         "System language",
@@ -71,6 +78,12 @@ val Core.settingOptions: List<CoreOption>
                             "MMPX",
                         ),
                         listOf("Off", "Anime4K Ultrafast", "Bicubic", "ScaleForce", "xBRZ", "MMPX"),
+                    ),
+                    CoreOption(
+                        "citra_texture_sampling",
+                        "Texture sampling",
+                        listOf("GameControlled", "NearestNeighbor", "Linear"),
+                        listOf("Game-controlled", "Nearest", "Linear"),
                     ),
                     CoreOption(
                         "citra_cpu_clock_percentage",
@@ -338,3 +351,7 @@ fun CoreSettings.options(): Map<String, String> =
         "citra_resolution_factor" to resolution.toString(),
         "citra_use_hw_shader" to if (hardwareShaders) "enabled" else "disabled",
     )
+
+/** Settings rows, including actions that apply to the whole core. */
+fun Core.settingIndices(perGame: Boolean): IntRange =
+    0 until settingOptions.size + if (this == Core.AZAHAR && !perGame) 1 else 0

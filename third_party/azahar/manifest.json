@@ -13,7 +13,8 @@
     "patches/0004-libretro-clock-resync.patch",
     "patches/0005-libretro-depth-state.patch",
     "patches/0006-libretro-frame-rate.patch",
-    "patches/0007-libretro-async-shaders.patch"
+    "patches/0007-libretro-async-shaders.patch",
+    "patches/0008-libretro-spirv-options.patch"
   ],
   "android_ndk": "29.0.14206865",
   "android_cmake": "3.30.3",

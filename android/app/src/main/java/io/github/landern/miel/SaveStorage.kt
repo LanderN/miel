@@ -36,6 +36,12 @@ object SaveStorage {
     fun download(platform: String, filename: String): File =
         folder("roms/$platform").resolve(filename)
 
+    /** Removes only Azahar's compiled and transferable shader caches. */
+    fun clearAzaharShaderCache(root: File = root()): Boolean {
+        val shaders = File(root, "saves/Azahar/shaders")
+        return !shaders.exists() || shaders.deleteRecursively()
+    }
+
     private fun folder(path: String): File {
         val folder = File(root(), path)
         if (!folder.isDirectory && !folder.mkdirs()) throw IOException("Cannot create $folder")

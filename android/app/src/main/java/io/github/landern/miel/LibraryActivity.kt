@@ -345,16 +345,23 @@ class LibraryActivity : ComponentActivity() {
     private fun overlayCommand(overlay: Overlay, command: Command) {
         when (overlay) {
             is Overlay.Settings -> {
-                val indices = overlay.core?.settingOptions?.indices ?: SETTINGS.indices
+                val indices = overlay.core?.settingIndices(overlay.perGame) ?: SETTINGS.indices
                 fun change(step: Int) {
                     val core = overlay.core ?: return
+                    if (overlay.selected !in core.settingOptions.indices) return
                     session.changeOption(core, overlay.selected, step, overlay.perGame)
                     sounds.play(if (session.error.isEmpty()) Cue.CONFIRM else Cue.ERROR)
                 }
                 fun choose(index: Int) {
                     if (index !in indices) return
                     this.overlay = overlay.copy(selected = index)
-                    if (overlay.core != null) {
+                    if (
+                        overlay.core == Core.AZAHAR &&
+                            !overlay.perGame &&
+                            index == overlay.core.settingOptions.size
+                    ) {
+                        clearShaderCache()
+                    } else if (overlay.core != null) {
                         session.changeOption(overlay.core, index, 1, overlay.perGame)
                         sounds.play(if (session.error.isEmpty()) Cue.CONFIRM else Cue.ERROR)
                     } else settingChosen(index)
@@ -491,6 +498,27 @@ class LibraryActivity : ComponentActivity() {
     private fun showMessage(title: String, text: String) {
         overlay = Overlay.Message(title, text)
         sounds.play(Cue.OPEN)
+    }
+
+    private fun clearShaderCache() {
+        if (!SaveStorage.available()) {
+            showMessage("Shader cache", "Storage access required")
+            return
+        }
+        showMessage("Shader cache", "Clearing…")
+        lifecycleScope.launch {
+            val cleared =
+                withContext(Dispatchers.IO) {
+                    try {
+                        SaveStorage.clearAzaharShaderCache()
+                    } catch (error: IOException) {
+                        false
+                    } catch (error: SecurityException) {
+                        false
+                    }
+                }
+            showMessage("Shader cache", if (cleared) "Cleared" else "Could not clear shader cache")
+        }
     }
 
     /** Opens the settings menu, or the scan progress while a scan runs. */

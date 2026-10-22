@@ -991,7 +991,7 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
         else
             listOf(
                 (if (overlay.perGame) "For this game" else "Defaults for all games") to
-                    options.indices,
+                    core.settingIndices(overlay.perGame),
             )
     Column(
         Modifier.fillMaxSize()
@@ -1052,7 +1052,9 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
                                 overlay.selected == i,
                                 session.gameRows,
                                 command,
-                                label = option?.label ?: SETTINGS[i],
+                                label =
+                                    if (core != null) option?.label ?: "Clear shader cache"
+                                    else SETTINGS[i],
                                 value = value,
                                 gameLayout = core == null && i == 0,
                             )
@@ -1078,7 +1080,12 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Pill("B", "Back", primary = false) { command(Command.B) }
-            Pill("A", if (core != null || overlay.selected == 0) "Change" else "Select") {
+            Pill(
+                "A",
+                if (core == Core.AZAHAR && !overlay.perGame && overlay.selected == options.size)
+                    "Clear"
+                else if (core != null || overlay.selected == 0) "Change" else "Select",
+            ) {
                 command(Command.A)
             }
         }

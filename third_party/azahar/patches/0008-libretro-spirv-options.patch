@@ -1,0 +1,60 @@
+--- a/src/citra_libretro/core_settings.cpp
++++ b/src/citra_libretro/core_settings.cpp
+@@ -56,6 +56,8 @@
+ namespace graphics {
+ static constexpr const char* graphics_api = citra_setting(BaseKeys::graphics_api);
+ static constexpr const char* async_shader_compilation = citra_setting(BaseKeys::async_shader_compilation);
++static constexpr const char* spirv_shader_gen = citra_setting(BaseKeys::spirv_shader_gen);
++static constexpr const char* disable_spirv_optimizer = citra_setting(BaseKeys::disable_spirv_optimizer);
+ static constexpr const char* use_hw_shader = citra_setting(BaseKeys::use_hw_shader);
+ static constexpr const char* use_shader_jit = citra_setting(BaseKeys::use_shader_jit);
+ static constexpr const char* shaders_accurate_mul = citra_setting(BaseKeys::shaders_accurate_mul);
+@@ -297,6 +299,34 @@
+             { nullptr, nullptr }
+         },
+         "auto"
++    },
++    {
++        config::graphics::spirv_shader_gen,
++        "SPIR-V Shader Generation",
++        "SPIR-V Shader Generation",
++        "Vulkan SPIR-V shader generation. Restart required.",
++        nullptr,
++        config::category::graphics,
++        {
++            { config::enabled, "Enabled" },
++            { config::disabled, "Disabled" },
++            { nullptr, nullptr }
++        },
++        config::enabled
++    },
++    {
++        config::graphics::disable_spirv_optimizer,
++        "Disable SPIR-V Optimizer",
++        "Disable SPIR-V Optimizer",
++        "Vulkan SPIR-V optimizer override. Restart required.",
++        nullptr,
++        config::category::graphics,
++        {
++            { config::enabled, "Enabled" },
++            { config::disabled, "Disabled" },
++            { nullptr, nullptr }
++        },
++        config::enabled
+     },
+     {
+         config::graphics::async_shader_compilation,
+@@ -971,6 +1001,13 @@
+     Settings::values.graphics_api =
+         GetGraphicsAPI(LibRetro::FetchVariable(config::graphics::graphics_api, "auto"));
+ 
++    Settings::values.spirv_shader_gen =
++        LibRetro::FetchVariable(config::graphics::spirv_shader_gen, config::enabled) ==
++        config::enabled;
++    Settings::values.disable_spirv_optimizer =
++        LibRetro::FetchVariable(config::graphics::disable_spirv_optimizer, config::enabled) ==
++        config::enabled;
++
+     Settings::values.async_shader_compilation =
+         LibRetro::FetchVariable(config::graphics::async_shader_compilation, config::disabled) ==
+         config::enabled;
