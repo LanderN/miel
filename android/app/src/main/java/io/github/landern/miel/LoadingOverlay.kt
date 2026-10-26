@@ -1,5 +1,6 @@
 package io.github.landern.miel
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -7,7 +8,6 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Shader
-import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.SystemClock
 import android.text.TextUtils
@@ -16,6 +16,7 @@ import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -53,7 +54,7 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
         val heading = TextView(context)
         heading.setTextColor(0xfffbf7ef.toInt())
         heading.textSize = 24f
-        heading.typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        heading.typeface = resources.getFont(R.font.nunito_bold)
         heading.gravity = Gravity.CENTER
         heading.maxLines = 2
         heading.ellipsize = TextUtils.TruncateAt.END
@@ -62,6 +63,7 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
         column.addView(heading)
         status.setTextColor(0xccfbf7ef.toInt())
         status.textSize = 14f
+        status.typeface = resources.getFont(R.font.nunito_regular)
         status.gravity = Gravity.CENTER
         status.setLineSpacing(0f, 1.2f)
         status.accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE
@@ -79,7 +81,11 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
     fun art(bitmap: Bitmap) {
         art.setImageBitmap(bitmap)
         art.alpha = 0f
-        art.animate().alpha(1f).setDuration(300).start()
+        art.animate()
+            .alpha(1f)
+            .setDuration(220)
+            .setInterpolator(DecelerateInterpolator(1.5f))
+            .start()
     }
 
     /**
@@ -97,9 +103,13 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
         animate().cancel()
         if (show) {
             visibility = VISIBLE
-            animate().alpha(1f).setDuration(300).start()
+            animate()
+                .alpha(1f)
+                .setDuration(220)
+                .setInterpolator(DecelerateInterpolator(1.5f))
+                .start()
         } else {
-            animate().alpha(0f).setDuration(300).withEndAction { visibility = GONE }.start()
+            animate().alpha(0f).setDuration(160).withEndAction { visibility = GONE }.start()
         }
     }
 
@@ -149,12 +159,14 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
             if (progress >= 0) {
                 rect.set(0f, 0f, maxOf(height, width * minOf(1f, progress)), height)
             } else {
-                val t = (SystemClock.uptimeMillis() % PERIOD) / PERIOD.toFloat()
+                val moving = ValueAnimator.areAnimatorsEnabled()
+                val t =
+                    if (moving) (SystemClock.uptimeMillis() % PERIOD) / PERIOD.toFloat() else .5f
                 val eased = (.5 - .5 * cos(PI * t)).toFloat()
                 val segment = width * .32f
                 val x = -segment + (width + segment) * eased
                 rect.set(maxOf(0f, x), 0f, minOf(width, x + segment), height)
-                postInvalidateOnAnimation()
+                if (moving) postInvalidateOnAnimation()
             }
             if (rect.width() > 0) canvas.drawRoundRect(rect, radius, radius, paint)
         }

@@ -28,6 +28,7 @@ data class Hero(
     val art: String,
     /** Draws `art` centred instead of covering the screen. */
     val icon: Boolean = false,
+    val settings: SettingsDetail? = null,
 )
 
 /**
@@ -42,7 +43,7 @@ class HeroView(context: Context) : View(context) {
     private val titleFace = context.resources.getFont(R.font.nunito_extrabold)
     private val detailFace = context.resources.getFont(R.font.nunito_regular)
     private val cache = LruCache<String, Bitmap>(4)
-    private val fade = ValueAnimator.ofFloat(0f, 1f).setDuration(300)
+    private val fade = ValueAnimator.ofFloat(0f, 1f).setDuration(220)
     private var decoder: ExecutorService? = null
     private var from = EMPTY
     private var to = EMPTY
@@ -87,14 +88,14 @@ class HeroView(context: Context) : View(context) {
      * as the new outgoing one.
      */
     private fun show(next: Hero, art: Bitmap?) {
-        if (art !== toArt || next.title != to.title || next.detail != to.detail) {
+        if (art !== toArt || next != to) {
             if (progress >= .5f) {
                 from = to
                 fromArt = toArt
             }
             fade.cancel()
-            progress = 0f
-            fade.start()
+            progress = if (ValueAnimator.areAnimatorsEnabled()) 0f else 1f
+            if (progress == 0f) fade.start()
         }
         to = next
         toArt = art
@@ -129,12 +130,80 @@ class HeroView(context: Context) : View(context) {
         // The library's 24dp gutter, scaled down on small displays.
         val scale = minOf(resources.displayMetrics.density, width / 480f, height / 270f)
         canvas.drawColor(BACKGROUND)
-        val fromAlpha = if (toArt != null && !to.icon) 1f else 1 - progress
-        drawArt(canvas, from, fromArt, fromAlpha, 1f, scale, width, height)
-        drawArt(canvas, to, toArt, progress, 1.06f - .06f * progress, scale, width, height)
-        canvas.drawRect(0f, 0f, width, height, shade)
-        drawText(canvas, from, 1 - minOf(1f, 2 * progress), 0f, scale, width, height)
-        drawText(canvas, to, progress, (1 - progress) * 8 * scale, scale, width, height)
+        if (from.settings == null && to.settings == null) {
+            val fromAlpha = if (toArt != null && !to.icon) 1f else 1 - progress
+            drawArt(canvas, from, fromArt, fromAlpha, scale, width, height)
+            drawArt(canvas, to, toArt, progress, scale, width, height)
+            canvas.drawRect(0f, 0f, width, height, shade)
+            drawText(canvas, from, 1 - minOf(1f, 2 * progress), scale, width, height)
+            drawText(canvas, to, progress, scale, width, height)
+            return
+        }
+        if (progress < 1f) drawScene(canvas, from, fromArt, 1f, scale, width, height)
+        drawScene(canvas, to, toArt, progress, scale, width, height)
+    }
+
+    private fun drawScene(
+        canvas: Canvas,
+        hero: Hero,
+        art: Bitmap?,
+        alpha: Float,
+        scale: Float,
+        width: Float,
+        height: Float,
+    ) {
+        if (alpha <= 0f) return
+        val layer = canvas.saveLayerAlpha(0f, 0f, width, height, (255 * alpha).toInt())
+        val settings = hero.settings
+        if (settings != null) {
+            canvas.drawColor(0xfff5efe4.toInt())
+            drawSettings(canvas, settings, scale, width, height)
+        } else {
+            canvas.drawColor(BACKGROUND)
+            drawArt(canvas, hero, art, 1f, scale, width, height)
+            canvas.drawRect(0f, 0f, width, height, shade)
+            drawText(canvas, hero, 1f, scale, width, height)
+        }
+        canvas.restoreToCount(layer)
+    }
+
+    private fun drawSettings(
+        canvas: Canvas,
+        detail: SettingsDetail,
+        scale: Float,
+        width: Float,
+        height: Float,
+    ) {
+        val gutter = 24 * scale
+        val textWidth = (width - 2 * gutter).toInt().coerceAtLeast(1)
+        var y = gutter
+        fun text(value: String, size: Float, bold: Boolean = false, lines: Int = 1) {
+            paint.typeface = if (bold) titleFace else detailFace
+            paint.color = if (bold) 0xff4b3928.toInt() else 0xff6c5b46.toInt()
+            paint.textSize = size * scale * resources.configuration.fontScale
+            val layout =
+                StaticLayout.Builder.obtain(value, 0, value.length, paint, textWidth)
+                    .setIncludePad(false)
+                    .setMaxLines(lines)
+                    .setEllipsize(TextUtils.TruncateAt.END)
+                    .build()
+            canvas.save()
+            canvas.translate(gutter, y)
+            layout.draw(canvas)
+            canvas.restore()
+            y += layout.height
+        }
+        text(detail.context, 14f)
+        y += 16 * scale
+        text(detail.title, 28f, bold = true, lines = 2)
+        detail.value?.let {
+            y += 12 * scale
+            text(it, 22f, bold = true)
+        }
+        y += 16 * scale
+        text(detail.description, 16f, lines = 3)
+        paint.color = 0xffd8c49e.toInt()
+        canvas.drawRect(gutter, height - gutter - scale, width - gutter, height - gutter, paint)
     }
 
     private fun drawArt(
@@ -142,7 +211,6 @@ class HeroView(context: Context) : View(context) {
         hero: Hero,
         art: Bitmap?,
         alpha: Float,
-        zoom: Float,
         scale: Float,
         width: Float,
         height: Float,
@@ -154,8 +222,8 @@ class HeroView(context: Context) : View(context) {
             } else {
                 maxOf(width / art.width, height / art.height)
             }
-        val artWidth = art.width * fit * zoom
-        val artHeight = art.height * fit * zoom
+        val artWidth = art.width * fit
+        val artHeight = art.height * fit
         bounds.set(
             (width - artWidth) / 2,
             (height - artHeight) / 2,
@@ -170,7 +238,6 @@ class HeroView(context: Context) : View(context) {
         canvas: Canvas,
         hero: Hero,
         alpha: Float,
-        offset: Float,
         scale: Float,
         width: Float,
         height: Float,
@@ -196,7 +263,7 @@ class HeroView(context: Context) : View(context) {
                 .setEllipsize(TextUtils.TruncateAt.END)
                 .build()
         canvas.save()
-        canvas.translate(x, height - 60 * scale - title.height + offset)
+        canvas.translate(x, height - 60 * scale - title.height)
         title.draw(canvas)
         canvas.restore()
         paint.typeface = detailFace
@@ -205,7 +272,7 @@ class HeroView(context: Context) : View(context) {
         paint.textSize = 14 * scale
         val detail =
             TextUtils.ellipsize(hero.detail, paint, width - 2 * x, TextUtils.TruncateAt.END)
-        canvas.drawText(detail.toString(), x, height - 24 * scale + offset, paint)
+        canvas.drawText(detail.toString(), x, height - 24 * scale, paint)
     }
 
     companion object {

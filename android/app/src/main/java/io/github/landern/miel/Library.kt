@@ -4,6 +4,8 @@ import android.graphics.Bitmap
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -22,7 +24,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -54,8 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -64,8 +64,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -80,10 +82,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 
@@ -106,18 +108,17 @@ private object Miel {
         )
     val textSmall = 12.sp
     val textBody = 14.sp
-    val background = Color(0xFFFBF7EF)
-    val surface = Color(0xFFFFFFFF)
+    val background = Color(0xFFF5EFE4)
+    val surface = Color(0xFFFFFAF1)
     val ink = Color(0xFF4B3928)
-    val muted = Color(0xFF817460)
-    val line = Color(0xFFE7DECE)
-    val pressed = Color(0xFFF2EBDD)
+    val muted = Color(0xFF6C5B46)
+    val line = Color(0xFFDED2BD)
+    val pressed = Color(0xFFEDE2CE)
+    val selection = Color(0xFFF3E2BE)
     val honey = Color(0xFFF5BC45)
-    val ring = Color(0xFFE8A329)
-    val keyInk = Color(0xFF755020)
-    val track = Color(0xFFE6D7BC)
-    val easeOut = CubicBezierEasing(0f, 0f, 0.58f, 1f)
-    val bounce = CubicBezierEasing(0.34f, 1.45f, 0.64f, 1f)
+    val ring = Color(0xFFA8731C)
+    val keyInk = Color(0xFF6B481D)
+    val easeOut = CubicBezierEasing(.2f, 0f, .2f, 1f)
 }
 
 /** The settings menu, in order; Pick(index) chooses one. */
@@ -194,7 +195,7 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
     val apps = session.tab == Tab.APPS
     val total = if (apps) session.apps.size else session.order.size
     val position = if (apps) session.appSelected else session.position
-    Box(Modifier.fillMaxSize().background(Miel.background).surfaceTexture(SurfaceTexture.Paper)) {
+    Box(Modifier.fillMaxSize().background(Miel.background)) {
         Column(
             Modifier.fillMaxSize().padding(Miel.margin),
             verticalArrangement = Arrangement.spacedBy(Miel.gap),
@@ -289,7 +290,7 @@ private fun Header(session: Session, command: (Command) -> Unit) {
         Segmented(
             tabs.map { it.label },
             tabs.indexOf(session.tab),
-            optionWidth = 64.dp,
+            optionWidth = 64.dp * LocalDensity.current.fontScale.coerceAtLeast(1f),
             modifier = Modifier.weight(1f),
             height = Miel.control,
             scrollState = rememberScrollState(),
@@ -298,10 +299,8 @@ private fun Header(session: Session, command: (Command) -> Unit) {
         }
         KeyHint("R") { command(Command.NextTab) }
         Pressable(Modifier.size(Miel.control), { command(Command.Select) }) { pressed ->
-            val background by
-                animateColorAsState(if (pressed) Miel.pressed else Color.Transparent, tween(110))
             Box(
-                Modifier.fillMaxSize().background(background, CircleShape),
+                Modifier.fillMaxSize().controlSurface(CircleShape, Miel.surface, pressed),
                 contentAlignment = Alignment.Center,
             ) {
                 Image(
@@ -370,8 +369,10 @@ private fun ColumnScope.TileGrid(
         val columnWidth =
             (maxWidth - gap * (if (paged) columns else columns - 1)) /
                 (columns + if (paged) 0.3f else 0f)
-        val aboveHeight = if (above != null) 24.dp else 0.dp
-        val belowHeight = if (below != null) 72.dp else 0.dp
+        val density = LocalDensity.current
+        val fontScale = density.fontScale.coerceAtLeast(1f)
+        val aboveHeight = if (above != null) 24.dp * fontScale else 0.dp
+        val belowHeight = if (below != null) 72.dp * fontScale else 0.dp
         val availableHeight = (maxHeight - aboveHeight - belowHeight).coerceAtLeast(1.dp)
         val rowHeight = (availableHeight - gap * (rows - 1)) / rows
         val cellWidth = aspect?.let { minOf(columnWidth, rowHeight * it) } ?: columnWidth
@@ -379,7 +380,6 @@ private fun ColumnScope.TileGrid(
             aspect?.let { minOf(rowHeight, cellWidth / it.coerceAtLeast(0.1f)) } ?: rowHeight
         val remaining = maxHeight - cellHeight * rows - gap * (rows - 1)
         val top = if (rows == 1) remaining / 2 else remaining
-        val density = LocalDensity.current
         val stride = with(density) { (cellWidth + gap).toPx() }
         val viewport = with(density) { maxWidth.toPx() }
         val tileWidth = with(density) { cellWidth.toPx() }
@@ -402,7 +402,16 @@ private fun ColumnScope.TileGrid(
         fun y(slot: Int) =
             if (rows == 1) aboveHeight + (availableHeight - cellHeight) / 2
             else top + (cellHeight + gap) * (slot % rows)
-        Box(Modifier.fillMaxSize().clipToBounds().scrollable(scrollState, Orientation.Horizontal)) {
+        Box(
+            Modifier.fillMaxSize()
+                .drawWithContent {
+                    val bleed = 10.dp.toPx()
+                    clipRect(-bleed, -bleed, size.width + bleed, size.height + bleed) {
+                        this@drawWithContent.drawContent()
+                    }
+                }
+                .scrollable(scrollState, Orientation.Horizontal),
+        ) {
             val visible = cells.filter {
                 val left = it.slot / rows * stride
                 left + tileWidth >= scroll && left <= scroll + viewport
@@ -418,6 +427,7 @@ private fun ColumnScope.TileGrid(
                 }
                 Box(
                     Modifier.offset(x(cell.slot) - scrollDp, y(cell.slot))
+                        .zIndex(if (cell.slot == slot) 1f else 0f)
                         .size(cellWidth, cellHeight),
                 ) {
                     tile(cell.index, cell.slot == slot, cellHeight)
@@ -431,15 +441,6 @@ private fun ColumnScope.TileGrid(
                     }
                 }
             }
-            val ringX by animateDpAsState(x(slot), tween(240, easing = Miel.easeOut))
-            val ringY by animateDpAsState(y(slot), tween(240, easing = Miel.easeOut))
-            Box(
-                Modifier.offset(ringX - scrollDp, ringY)
-                    .size(cellWidth, cellHeight)
-                    .border(2.dp, Miel.ring, RoundedCornerShape(Miel.tileRadius))
-                    .padding(2.dp)
-                    .border(1.dp, Miel.background, RoundedCornerShape(Miel.tileRadius - 2.dp)),
-            )
         }
     }
 }
@@ -498,9 +499,7 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
         val game = session.games[index]
         Tile(
             chosen,
-            Color(0xFFF4EFE4),
-            Lift(12.dp, 3.dp),
-            Lift(24.dp, 9.dp),
+            Miel.surface,
             { command(if (chosen) Command.A else Command.Pick(index)) },
         ) {
             val cover = art.cover(game)
@@ -577,8 +576,6 @@ private fun ColumnScope.AppGrid(session: Session, art: Art, command: (Command) -
         Tile(
             chosen,
             Miel.surface,
-            Lift(8.dp, 2.dp),
-            Lift(16.dp, 6.dp),
             { command(Command.Pick(index)) },
             border = true,
         ) {
@@ -605,38 +602,46 @@ private fun ColumnScope.AppGrid(session: Session, art: Art, command: (Command) -
     }
 }
 
-/** A shadow's blur and downward offset. */
-private class Lift(val blur: Dp, val offset: Dp)
-
-/** A tile that rests at `rest` and takes the deeper shadow `lifted` while selected. */
+/** The selected cover rises out of its mount with a critically damped settle. */
 @Composable
 private fun Tile(
     chosen: Boolean,
     background: Color,
-    rest: Lift,
-    lifted: Lift,
     onClick: () -> Unit,
     border: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val shape = RoundedCornerShape(Miel.tileRadius)
-    val spring = tween<Dp>(280, easing = Miel.bounce)
-    val blur by animateDpAsState(if (chosen) lifted.blur else rest.blur, spring)
-    val offset by animateDpAsState(if (chosen) lifted.offset else rest.offset, spring)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val height by
+        animateFloatAsState(
+            if (pressed) .4f else if (chosen) 2.2f else .75f,
+            tween(if (pressed) 90 else 180, easing = Miel.easeOut),
+        )
+    val scale by
+        animateFloatAsState(
+            if (pressed) .99f else if (chosen) 1.055f else 1f,
+            spring(dampingRatio = 1f, stiffness = 450f),
+        )
+    val rise by
+        animateDpAsState(
+            if (chosen && !pressed) (-4).dp else 0.dp,
+            spring(dampingRatio = 1f, stiffness = 450f),
+        )
     Box(
         Modifier.fillMaxSize()
-            .dropShadow(
-                shape,
-                Shadow(
-                    blur,
-                    if (chosen) Color(0x33A8701F) else Color(0x1A74501D),
-                    offset = DpOffset(0.dp, offset),
-                ),
-            )
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationY = rise.toPx()
+            }
+            .softShadow(shape, height)
             .clip(shape)
             .background(background)
-            .then(if (border) Modifier.border(1.dp, Miel.line, shape) else Modifier)
-            .clickable(remember { MutableInteractionSource() }, null, onClick = onClick),
+            .border(if (border) 1.dp else 2.dp, if (chosen) Miel.background else Miel.line, shape)
+            .semantics { selected = chosen }
+            .clickable(interaction, null, onClick = onClick),
     ) {
         content()
     }
@@ -649,7 +654,7 @@ private fun Dots(total: Int, position: Int) {
             val width by
                 animateDpAsState(
                     if (i == position) 18.dp else 7.dp,
-                    tween(240, easing = Miel.easeOut),
+                    tween(180, easing = Miel.easeOut),
                 )
             Box(
                 Modifier.width(width)
@@ -672,9 +677,24 @@ private fun Pressable(
     Box(modifier.clickable(interaction, null, onClick = onClick)) { content(pressed) }
 }
 
-/**
- * A button with its controller key. The face rests on a darker lip and sinks into it while pressed.
- */
+/** A control settles toward its contact shadow on press and returns without overshoot. */
+@Composable
+private fun Modifier.controlSurface(
+    shape: Shape,
+    face: Color,
+    pressed: Boolean,
+    outline: Color? = null,
+): Modifier {
+    val depth by
+        animateFloatAsState(
+            if (pressed) .3f else 1f,
+            tween(if (pressed) 90 else 160, easing = Miel.easeOut),
+        )
+    return graphicsLayer { translationY = ((1f - depth) * 1.5f).dp.toPx() }
+        .relief(shape, face, height = depth, outline = outline)
+}
+
+/** A raised cream or honey action with an inset controller badge. */
 @Composable
 private fun RowScope.Pill(
     key: String,
@@ -685,122 +705,47 @@ private fun RowScope.Pill(
     fill: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val lip = 4.dp
     Pressable(if (fill) Modifier.weight(1f) else Modifier, onClick) { pressed ->
-        val sink by
-            animateDpAsState(
-                if (pressed) 3.dp else 0.dp,
-                tween(110, easing = CubicBezierEasing(0.34f, 1.5f, 0.64f, 1f)),
-            )
-        val shadow by animateDpAsState(if (pressed) 1.dp else 3.dp, tween(100))
         val face by
             animateColorAsState(
                 when {
                     pressed && destructive -> Color(0xFFF3D3DB)
-                    pressed && primary -> Color(0xFFE6A126)
+                    pressed && primary -> Color(0xFFE6A62F)
                     pressed -> Miel.pressed
                     destructive -> Color(0xFFFBE8EB)
-                    primary -> Miel.honey
-                    else -> Color(0xFFFFFCF5)
+                    primary -> Color(0xFFEFB13A)
+                    else -> Miel.surface
                 },
-                tween(110),
+                tween(120, easing = Miel.easeOut),
             )
         val shape = RoundedCornerShape(Miel.control / 2)
         val size = Modifier.height(Miel.control).widthIn(min = minWidth)
-        Box(if (fill) size.fillMaxWidth() else size, contentAlignment = Alignment.Center) {
-            Box(
-                Modifier.matchParentSize()
-                    .padding(top = lip)
-                    .dropShadow(
-                        shape,
-                        Shadow(8.dp, Color(0x2674501D), offset = DpOffset(0.dp, shadow)),
-                    )
-                    .background(
+        Row(
+            (if (fill) size.fillMaxWidth() else size)
+                .controlSurface(
+                    shape,
+                    face,
+                    pressed,
+                    outline =
                         when {
-                            destructive -> Color(0xFFE5B3BF)
-                            primary -> Color(0xFFD8901C)
-                            else -> Miel.track
+                            destructive -> Color(0xFFBE8694)
+                            primary -> Color(0xFFA16D1C)
+                            else -> Color(0xFFAD9676)
                         },
-                        shape,
-                    ),
-            )
-            Box(
-                Modifier.matchParentSize()
-                    .padding(bottom = lip)
-                    .offset(y = sink)
-                    .background(face, shape)
-                    .surfaceTexture(SurfaceTexture.Satin, shape)
-                    .border(
-                        1.dp,
-                        when {
-                            destructive -> Color(0xFFEDC6CF)
-                            primary -> Color(0xFFEDB23F)
-                            else -> Color(0xFFEADFCB)
-                        },
-                        shape,
-                    ),
-            )
-            Row(
-                Modifier.fillMaxHeight()
-                    .padding(
-                        // The bounce overshoots below zero.
-                        PaddingValues(
-                            Miel.gap,
-                            sink.coerceIn(0.dp, lip),
-                            Miel.gap,
-                            (lip - sink).coerceIn(0.dp, lip),
-                        ),
-                    ),
-                horizontalArrangement =
-                    Arrangement.spacedBy(Miel.spaceSm, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Round key bubble with its own small lip.
-                Box(
-                    Modifier.size(24.dp)
-                        .background(
-                            when {
-                                destructive -> Color(0xFFE5B3BF)
-                                primary -> Color(0xFFDE9A2A)
-                                else -> Color(0xFFE3CFA8)
-                            },
-                            CircleShape,
-                        ),
-                ) {
-                    Box(
-                        Modifier.fillMaxWidth()
-                            .height(22.dp)
-                            .background(
-                                when {
-                                    destructive -> Color.White
-                                    primary -> Color(0xFFFFF8E6)
-                                    else -> Color(0xFFF8ECD3)
-                                },
-                                CircleShape,
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            key,
-                            color = if (destructive) Color(0xFF9A455A) else Miel.keyInk,
-                            size = 11.sp,
-                            weight = FontWeight.ExtraBold,
-                        )
-                    }
-                }
-                Text(
-                    label,
-                    color =
-                        when {
-                            destructive -> Color(0xFF9A455A)
-                            primary -> Color(0xFF4B321B)
-                            else -> Color(0xFF6E5F4B)
-                        },
-                    size = Miel.textBody,
-                    weight = FontWeight.Bold,
-                    lines = 1,
                 )
-            }
+                .padding(horizontal = Miel.gap),
+            horizontalArrangement =
+                Arrangement.spacedBy(Miel.spaceSm, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ControllerBadge(key, Modifier.size(26.dp), face)
+            Text(
+                label,
+                color = if (destructive) Color(0xFF9A455A) else Miel.ink,
+                size = Miel.textBody,
+                weight = FontWeight.Bold,
+                lines = 1,
+            )
         }
     }
 }
@@ -810,18 +755,11 @@ private fun RowScope.Pill(
 private fun KeyHint(key: String, onClick: () -> Unit) {
     Pressable(Modifier.size(Miel.control), onClick) { pressed ->
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Box(
-                Modifier.size(30.dp, 22.dp)
-                    .background(
-                        if (pressed) Miel.pressed else Color(0xFFFFFCF5),
-                        RoundedCornerShape(7.dp),
-                    )
-                    .surfaceTexture(SurfaceTexture.Satin, RoundedCornerShape(7.dp))
-                    .border(1.dp, Color(0xFFE3CFA8), RoundedCornerShape(7.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(key, color = Miel.keyInk, size = 11.sp, weight = FontWeight.ExtraBold)
-            }
+            ControllerBadge(
+                key,
+                Modifier.size(32.dp, 24.dp),
+                if (pressed) Miel.pressed else Miel.surface,
+            )
         }
     }
 }
@@ -840,8 +778,7 @@ private fun Segmented(
     Row(
         modifier
             .height(height)
-            .background(Miel.pressed, RoundedCornerShape(18.dp))
-            .border(1.dp, Miel.line, RoundedCornerShape(18.dp))
+            .relief(RoundedCornerShape(18.dp), Miel.surface, height = .65f)
             .padding(3.dp)
             .then(if (scrollState != null) Modifier.horizontalScroll(scrollState) else Modifier),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -857,20 +794,22 @@ private fun Segmented(
                     animateColorAsState(
                         when {
                             i == current -> Miel.honey
-                            pressed -> Miel.track
-                            else -> Color.Transparent
+                            pressed -> Miel.pressed
+                            else -> Miel.surface
                         },
-                        tween(110),
+                        tween(140, easing = Miel.easeOut),
                     )
                 Box(
                     Modifier.fillMaxSize()
-                        .background(background, RoundedCornerShape(15.dp))
                         .then(
-                            if (i == current || pressed)
-                                Modifier.surfaceTexture(
-                                    SurfaceTexture.Satin,
+                            if (i == current)
+                                Modifier.controlSurface(
                                     RoundedCornerShape(15.dp),
+                                    background,
+                                    pressed,
                                 )
+                            else if (pressed)
+                                Modifier.relief(RoundedCornerShape(15.dp), background, inset = true)
                             else Modifier,
                         ),
                     contentAlignment = Alignment.Center,
@@ -903,11 +842,7 @@ private fun Dialog(title: String, content: @Composable ColumnScope.() -> Unit) {
             Modifier.padding(Miel.margin)
                 .widthIn(max = 460.dp)
                 .fillMaxWidth()
-                // Cream base under the dialog face.
-                .dropShadow(shape, Shadow(0.dp, Color(0xFFEFE2C8), offset = DpOffset(0.dp, 6.dp)))
-                .dropShadow(shape, Shadow(28.dp, Color(0x335D401F), offset = DpOffset(0.dp, 16.dp)))
-                .background(Miel.surface, shape)
-                .border(1.dp, Miel.line, shape)
+                .relief(shape, Miel.surface, height = 2.2f)
                 .padding(Miel.margin),
             verticalArrangement = Arrangement.spacedBy(Miel.gap),
         ) {
@@ -993,11 +928,9 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
                 (if (overlay.perGame) "For this game" else "Defaults for all games") to
                     core.settingIndices(overlay.perGame),
             )
+    val group = groups.indexOfFirst { overlay.selected in it.second }.coerceAtLeast(0)
     Column(
-        Modifier.fillMaxSize()
-            .background(Miel.background)
-            .surfaceTexture(SurfaceTexture.Paper)
-            .padding(Miel.margin),
+        Modifier.fillMaxSize().background(Miel.background).padding(Miel.margin),
         verticalArrangement = Arrangement.spacedBy(Miel.gap),
     ) {
         Text(core?.coreName ?: "Settings", color = Miel.ink, size = 28.sp, weight = FontWeight.Bold)
@@ -1016,56 +949,86 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
                 size = Miel.textSmall,
             )
         }
-        Column(
-            Modifier.weight(1f).verticalScroll(remember { ScrollState(0) }),
-            verticalArrangement = Arrangement.spacedBy(Miel.margin),
+        Row(
+            Modifier.weight(1f).fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Miel.gap),
         ) {
-            groups.forEach { (title, indices) ->
-                Column(verticalArrangement = Arrangement.spacedBy(Miel.spaceSm)) {
-                    Text(
-                        title,
-                        Modifier.padding(start = Miel.inset),
-                        Miel.muted,
-                        Miel.textSmall,
-                        FontWeight.SemiBold,
-                    )
-                    Column(
-                        Modifier.fillMaxWidth()
-                            .clip(RoundedCornerShape(Miel.tileRadius))
-                            .background(Miel.surface)
-                            .padding(Miel.spaceXs),
-                    ) {
-                        indices.forEach { i ->
-                            val option = options.getOrNull(i)
-                            val value =
-                                if (core != null && option != null) {
-                                    val current =
-                                        session
-                                            .optionValues(core, overlay.perGame)
-                                            .getValue(option.key)
-                                    if (overlay.perGame && option.key !in session.gameOverrides())
-                                        "Default: ${option.label(current)}"
-                                    else option.label(current)
-                                } else null
-                            SettingsOption(
-                                i,
-                                overlay.selected == i,
-                                session.gameRows,
-                                command,
-                                label =
-                                    if (core != null) option?.label ?: "Clear shader cache"
-                                    else SETTINGS[i],
-                                value = value,
-                                gameLayout = core == null && i == 0,
-                            )
-                            if (i != indices.last) {
-                                Box(
-                                    Modifier.padding(horizontal = Miel.inset)
-                                        .fillMaxWidth()
-                                        .height(1.dp)
-                                        .background(Miel.line),
+            if (core == null) {
+                Column(
+                    Modifier.width(136.dp).padding(vertical = Miel.spaceSm),
+                    verticalArrangement = Arrangement.spacedBy(Miel.inset),
+                ) {
+                    groups.forEachIndexed { index, (title, indices) ->
+                        val chosen = index == group
+                        val shape = RoundedCornerShape(16.dp)
+                        Pressable(
+                            Modifier.fillMaxWidth().semantics { selected = chosen },
+                            { command(Command.FocusSetting(indices.first)) },
+                        ) { pressed ->
+                            Box(
+                                Modifier.fillMaxWidth()
+                                    .heightIn(min = 64.dp)
+                                    .relief(
+                                        shape,
+                                        if (chosen) Miel.selection else Miel.surface,
+                                        height = .5f,
+                                        inset = chosen || pressed,
+                                        outline = if (chosen) Miel.ring else null,
+                                    )
+                                    .padding(Miel.inset),
+                                contentAlignment = Alignment.CenterStart,
+                            ) {
+                                Text(
+                                    title,
+                                    color = Miel.ink,
+                                    size = Miel.textBody,
+                                    weight = FontWeight.Bold,
                                 )
                             }
+                        }
+                    }
+                }
+            }
+            Column(
+                Modifier.weight(1f)
+                    .fillMaxHeight()
+                    .verticalScroll(remember(core, group) { ScrollState(0) })
+                    .padding(horizontal = 6.dp, vertical = Miel.spaceSm),
+            ) {
+                val indices = groups[group].second
+                Column(
+                    Modifier.fillMaxWidth()
+                        .relief(RoundedCornerShape(Miel.tileRadius), Miel.surface, height = .7f)
+                        .padding(Miel.spaceXs),
+                ) {
+                    indices.forEach { i ->
+                        val option = options.getOrNull(i)
+                        val value =
+                            if (core != null && option != null) {
+                                val current =
+                                    session.optionValues(core, overlay.perGame).getValue(option.key)
+                                if (overlay.perGame && option.key !in session.gameOverrides())
+                                    "Default: ${option.label(current)}"
+                                else option.label(current)
+                            } else null
+                        SettingsOption(
+                            i,
+                            overlay.selected == i,
+                            session.gameRows,
+                            command,
+                            label =
+                                if (core != null) option?.label ?: "Clear shader cache"
+                                else SETTINGS[i],
+                            value = value,
+                            gameLayout = core == null && i == 0,
+                        )
+                        if (i != indices.last) {
+                            Box(
+                                Modifier.padding(horizontal = Miel.inset)
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(Miel.line),
+                            )
                         }
                     }
                 }
@@ -1115,16 +1078,24 @@ private fun SettingsOption(
             animateColorAsState(
                 when {
                     pressed -> Miel.pressed
-                    chosen -> Color(0xFFFFF3D6)
+                    chosen -> Miel.selection
                     else -> Miel.surface
                 },
-                tween(110),
+                tween(140, easing = Miel.easeOut),
             )
         Row(
             Modifier.fillMaxWidth()
                 .heightIn(min = 56.dp)
-                .background(face, shape)
-                .then(if (chosen) Modifier.border(2.dp, Miel.ring, shape) else Modifier)
+                .then(
+                    if (chosen || pressed)
+                        Modifier.relief(
+                            shape,
+                            face,
+                            inset = true,
+                            outline = if (chosen) Miel.ring else null,
+                        )
+                    else Modifier,
+                )
                 .padding(horizontal = Miel.inset, vertical = Miel.spaceXs),
             horizontalArrangement = Arrangement.spacedBy(Miel.inset),
             verticalAlignment = Alignment.CenterVertically,
@@ -1149,7 +1120,7 @@ private fun SettingsOption(
                 Segmented(
                     listOf("1 row", "2 rows"),
                     gameRows - 1,
-                    optionWidth = 60.dp,
+                    optionWidth = 64.dp * LocalDensity.current.fontScale.coerceAtLeast(1f),
                     height = 54.dp,
                 ) {
                     command(Command.GameRows(it + 1))
@@ -1244,6 +1215,7 @@ private fun RomMAddress(overlay: Overlay.RomMAddress, command: (Command) -> Unit
         BasicTextField(
             overlay.address,
             Modifier.fillMaxWidth()
+                .relief(RoundedCornerShape(Miel.inset), Miel.surface, inset = true)
                 .border(2.dp, Miel.ring, RoundedCornerShape(Miel.inset))
                 .padding(Miel.inset)
                 .focusRequester(focus),

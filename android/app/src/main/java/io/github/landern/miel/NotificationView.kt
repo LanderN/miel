@@ -1,26 +1,36 @@
 package io.github.landern.miel
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
-import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.os.SystemClock
 import android.text.TextPaint
 import android.text.TextUtils
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 
 /** A passive card at the top of the lower display; game details keep their original position. */
 class NotificationView(context: Context) : View(context) {
     private val paint = TextPaint(Paint.ANTI_ALIAS_FLAG)
     private val rect = RectF()
+    private val regular = resources.getFont(R.font.nunito_regular)
+    private val bold = resources.getFont(R.font.nunito_bold)
+    private val card =
+        GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            intArrayOf(0xfff8f2e8.toInt(), 0xfff5efe4.toInt(), 0xffeee5d6.toInt()),
+        )
     private var value: MielNotification? = null
     private val listener: (MielNotification?) -> Unit = { next ->
         animate().cancel()
         if (next == null) {
             animate()
                 .alpha(0f)
-                .setDuration(300)
+                .setDuration(160)
+                .setInterpolator(DecelerateInterpolator())
                 .withEndAction {
                     value = null
                     contentDescription = null
@@ -30,7 +40,7 @@ class NotificationView(context: Context) : View(context) {
         } else {
             value = next
             contentDescription = "miel. ${next.title}. ${next.detail}. ${next.count}"
-            animate().alpha(1f).setDuration(300).start()
+            animate().alpha(1f).setDuration(220).setInterpolator(DecelerateInterpolator()).start()
             invalidate()
         }
     }
@@ -59,9 +69,15 @@ class NotificationView(context: Context) : View(context) {
         val top = 12 * s
         val right = width - left
         val bottom = top + 80 * s
-        paint.color = 0xfffbf7ef.toInt()
+        paint.color = 0xfff5efe4.toInt()
         rect.set(left, top, right, bottom)
+        paint.setShadowLayer(4 * s, s, 2 * s, 0x384b3928)
         canvas.drawRoundRect(rect, 18 * s, 18 * s, paint)
+        paint.clearShadowLayer()
+        card.setBounds(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
+        card.cornerRadius = 18 * s
+        card.setStroke(s.toInt().coerceAtLeast(1), 0xffded2bd.toInt())
+        card.draw(canvas)
         paint.color = 0xfff5bc45.toInt()
         canvas.drawCircle(left + 25 * s, top + 25 * s, 13 * s, paint)
         fun text(
@@ -75,8 +91,7 @@ class NotificationView(context: Context) : View(context) {
         ) {
             paint.color = color
             paint.textSize = size * s
-            paint.typeface =
-                Typeface.create(if (bold) "sans-serif-medium" else "sans-serif", Typeface.NORMAL)
+            paint.typeface = if (bold) this@NotificationView.bold else regular
             canvas.drawText(
                 TextUtils.ellipsize(text, paint, max.coerceAtLeast(0f), TextUtils.TruncateAt.END)
                     .toString(),
@@ -95,24 +110,28 @@ class NotificationView(context: Context) : View(context) {
         )
         val x = left + 48 * s
         val end = right - 14 * s
-        text("miel · ${item.heading}", x, top + 19 * s, 10f, 0xff817460.toInt(), end - x - 90 * s)
+        text("miel · ${item.heading}", x, top + 19 * s, 10f, 0xff6c5b46.toInt(), end - x - 90 * s)
         paint.textSize = 10 * s
         val countWidth = paint.measureText(item.count)
-        text(item.count, end - countWidth, top + 19 * s, 10f, 0xff817460.toInt(), countWidth + s)
+        text(item.count, end - countWidth, top + 19 * s, 10f, 0xff6c5b46.toInt(), countWidth + s)
         text(item.title, x, top + 38 * s, 14f, 0xff4b3928.toInt(), end - x, true)
-        text(item.detail, x, top + 55 * s, 11f, 0xff817460.toInt(), end - x)
+        text(item.detail, x, top + 55 * s, 11f, 0xff6c5b46.toInt(), end - x)
         val barLeft = left + 14 * s
         val barRight = right - 14 * s
         rect.set(barLeft, bottom - 13 * s, barRight, bottom - 8 * s)
-        paint.color = 0xffe6d7bc.toInt()
+        paint.color = 0xffded2bd.toInt()
         canvas.drawRoundRect(rect, 3 * s, 3 * s, paint)
         paint.color = 0xfff5bc45.toInt()
         if (item.progress < 0) {
-            val t = (SystemClock.uptimeMillis() % 1600) / 1600f
             val w = barRight - barLeft
-            rect.left = barLeft + (w * 1.3f * t - w * .3f).coerceAtLeast(0f)
-            rect.right = (barLeft + w * 1.3f * t).coerceAtMost(barRight)
-            postInvalidateOnAnimation()
+            if (ValueAnimator.areAnimatorsEnabled()) {
+                val t = (SystemClock.uptimeMillis() % 1600) / 1600f
+                rect.left = barLeft + (w * 1.3f * t - w * .3f).coerceAtLeast(0f)
+                rect.right = (barLeft + w * 1.3f * t).coerceAtMost(barRight)
+                if (alpha > 0f && isShown) postInvalidateOnAnimation()
+            } else {
+                rect.right = barLeft + w * .3f
+            }
         } else rect.right = barLeft + (barRight - barLeft) * item.progress.coerceIn(0f, 1f)
         if (rect.width() > 0) canvas.drawRoundRect(rect, 3 * s, 3 * s, paint)
         if (item.finished && item.unavailableFraction > 0) {

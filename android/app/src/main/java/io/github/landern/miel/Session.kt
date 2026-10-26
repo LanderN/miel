@@ -82,6 +82,9 @@ sealed interface Command {
     /** A game layout segment in Settings was touched. */
     data class GameRows(val value: Int) : Command
 
+    /** A settings category was touched; selects its first row without activating it. */
+    data class FocusSetting(val index: Int) : Command
+
     /** A resolution segment in More was touched. */
     data class Resolution(val value: Int) : Command
 

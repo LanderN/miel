@@ -203,8 +203,12 @@ class LibraryActivity : ComponentActivity() {
         return image(artwork.heroPath(game.id))?.let { Cover(it, boxart = false) }
     }
 
-    /** The selected game or app, for the lower screen. */
+    /** The selected setting, game or app, for the lower screen. */
     private fun hero(): Hero {
+        (overlay as? Overlay.Settings)?.let {
+            val detail = settingsDetail(it, session)
+            return Hero(detail.title, detail.context, "", settings = detail)
+        }
         artworkVersion
         return if (session.tab == Tab.APPS) {
             session.app?.let {
@@ -369,6 +373,12 @@ class LibraryActivity : ComponentActivity() {
                     } else settingChosen(index)
                 }
                 when (command) {
+                    is Command.FocusSetting -> {
+                        if (command.index in indices) {
+                            this.overlay = overlay.copy(selected = command.index)
+                            sounds.play(Cue.NAVIGATE)
+                        }
+                    }
                     Command.Up,
                     Command.Down -> {
                         val step = if (command == Command.Up) -1 else 1

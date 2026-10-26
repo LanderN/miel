@@ -1,14 +1,16 @@
 package io.github.landern.miel
 
+import android.animation.ObjectAnimator
+import android.animation.StateListAnimator
 import android.content.Context
 import android.content.res.ColorStateList
-import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -24,12 +26,15 @@ class PlayControls(
     private val insert: (Int) -> Unit,
     private val toggleAnalog: () -> Unit,
 ) : FrameLayout(context) {
-    private val cream = 0xfffbf7ef.toInt()
+    private val cream = 0xfff5efe4.toInt()
+    private val surface = 0xfffffaf1.toInt()
     private val ink = 0xff4b3928.toInt()
-    private val muted = 0xff817460.toInt()
-    private val honey = 0xfff5bc45.toInt()
-    private val ring = 0xffe8a329.toInt()
-    private val line = 0xffe7dece.toInt()
+    private val muted = 0xff6c5b46.toInt()
+    private val honey = 0xffefb13a.toInt()
+    private val ring = 0xffa8731c.toInt()
+    private val line = 0xffded2bd.toInt()
+    private val regular = resources.getFont(R.font.nunito_regular)
+    private val bold = resources.getFont(R.font.nunito_bold)
     private val dock = LinearLayout(context)
     private val current = label("", 14f)
     private val change = action("R3", "Change disc", true) { open() }
@@ -37,13 +42,12 @@ class PlayControls(
     private val analog =
         Switch(context).apply {
             showText = false
-            thumbDrawable =
-                background(0xfffffdfa.toInt(), 14, line).apply { setSize(dp(28), dp(28)) }
+            thumbDrawable = background(surface, 14, line).apply { setSize(dp(28), dp(28)) }
             trackDrawable = background(honey, 14).apply { setSize(dp(48), dp(28)) }
             switchMinWidth = dp(48)
             minHeight = dp(48)
             contentDescription = "Analog controls"
-            thumbTintList = ColorStateList.valueOf(0xfffffdfa.toInt())
+            thumbTintList = null
             trackTintList =
                 ColorStateList(
                     arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
@@ -68,8 +72,12 @@ class PlayControls(
         visibility = GONE
         dock.orientation = LinearLayout.VERTICAL
         dock.setPadding(dp(16), dp(8), dp(16), dp(8))
-        dock.background = background(cream, 26)
-        dock.elevation = dp(4).toFloat()
+        dock.background = background(surface, 26, line)
+        dock.elevation = dp(3).toFloat()
+        dock.outlineAmbientShadowColor = 0x244b3928
+        dock.outlineSpotShadowColor = 0x384b3928
+        dock.clipChildren = false
+        clipChildren = false
         discRow.gravity = Gravity.CENTER_VERTICAL
         discRow.addView(current, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         discRow.addView(change)
@@ -153,6 +161,7 @@ class PlayControls(
             row.gravity = Gravity.CENTER_VERTICAL
             row.setPadding(dp(20), dp(16), dp(20), dp(16))
             row.isClickable = true
+            relief(row)
             row.setOnClickListener {
                 selected = disc
                 confirm()
@@ -209,7 +218,7 @@ class PlayControls(
         choices.forEachIndexed { disc, view ->
             view.background =
                 background(
-                    if (disc == selected) 0xfffff1d0.toInt() else 0xffffffff.toInt(),
+                    if (disc == selected) 0xfff3dfb3.toInt() else surface,
                     18,
                     if (disc == selected) ring else line,
                 )
@@ -224,15 +233,29 @@ class PlayControls(
         LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(10), dp(20), dp(10))
-            background = background(if (primary) honey else 0xfffffdfa.toInt(), 26)
+            background =
+                background(
+                    if (primary) honey else surface,
+                    26,
+                    if (primary) 0xffa16d1c.toInt() else 0xffad9676.toInt(),
+                )
             isClickable = true
             isFocusable = true
+            relief(this)
             contentDescription = text
             setOnClickListener { clicked() }
             val badge =
                 label(key, 12f, true).apply {
                     gravity = Gravity.CENTER
-                    background = background(if (primary) 0xfffff1d0.toInt() else cream, 12)
+                    background =
+                        GradientDrawable().apply {
+                            shape = GradientDrawable.OVAL
+                            setColor(0)
+                            setStroke(
+                                dp(1),
+                                if (primary) 0xff7e561c.toInt() else 0xff957a50.toInt(),
+                            )
+                        }
                 }
             addView(badge, LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginEnd = dp(10) })
             addView(label(text, 14f, true))
@@ -243,16 +266,44 @@ class PlayControls(
             text = value
             textSize = size
             setTextColor(if (bold) ink else muted)
-            typeface =
-                Typeface.create(if (bold) "sans-serif-medium" else "sans-serif", Typeface.NORMAL)
+            typeface = if (bold) this@PlayControls.bold else regular
         }
 
     private fun background(color: Int, radius: Int, border: Int? = null) =
-        GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = dp(radius).toFloat()
-            if (border != null) setStroke(dp(2), border)
-        }
+        GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                when (color) {
+                    cream -> intArrayOf(0xfff8f2e8.toInt(), cream, 0xffeee5d6.toInt())
+                    surface -> intArrayOf(surface, 0xfffcf6eb.toInt(), 0xfff8efdf.toInt())
+                    honey -> intArrayOf(0xfff3bb48.toInt(), honey, 0xffe8a72f.toInt())
+                    else -> intArrayOf(color, color)
+                },
+            )
+            .apply {
+                cornerRadius = dp(radius).toFloat()
+                if (border != null) setStroke(dp(if (border == ring) 2 else 1), border)
+            }
+
+    private fun relief(view: View) {
+        view.outlineAmbientShadowColor = 0x244b3928
+        view.outlineSpotShadowColor = 0x384b3928
+        view.stateListAnimator =
+            StateListAnimator().apply {
+                fun state(attributes: IntArray, height: Int) {
+                    addState(
+                        attributes,
+                        ObjectAnimator.ofFloat(view, "elevation", dp(height).toFloat()).apply {
+                            duration = 160
+                            interpolator = DecelerateInterpolator()
+                        },
+                    )
+                }
+                state(intArrayOf(android.R.attr.state_pressed), 0)
+                state(intArrayOf(android.R.attr.state_selected), 3)
+                state(intArrayOf(android.R.attr.state_focused), 3)
+                state(intArrayOf(), 2)
+            }
+    }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).roundToInt()
 }
