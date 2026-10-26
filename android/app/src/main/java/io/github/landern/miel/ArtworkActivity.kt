@@ -44,6 +44,16 @@ class ArtworkActivity : Activity() {
                 setContentView(host)
                 it.update(hero)
             }
+        applyBrightness()
+    }
+
+    private fun applyBrightness() {
+        window.attributes =
+            window.attributes.apply {
+                screenBrightness =
+                    if (dimmed) WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_OFF
+                    else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+            }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent) =
@@ -72,6 +82,7 @@ class ArtworkActivity : Activity() {
         private var current: ArtworkActivity? = null
         private var requested = false
         private var yielded = false
+        private var dimmed = false
         private var generation = 0
         private var hero = Hero("", "", "")
 
@@ -107,6 +118,13 @@ class ArtworkActivity : Activity() {
         /** Leaves the lower display to an app that opens there. */
         fun yieldToApp() {
             yielded = true
+            dim(false)
+        }
+
+        /** Uses minimum brightness while another app covers the upper library. */
+        fun dim(dim: Boolean) {
+            dimmed = dim && !yielded
+            current?.applyBrightness()
         }
 
         fun reclaim() {
@@ -121,4 +139,3 @@ class ArtworkActivity : Activity() {
         }
     }
 }
-

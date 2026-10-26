@@ -158,11 +158,13 @@ class LibraryActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        ArtworkActivity.dim(false)
         sounds.setActive(true)
         ArtworkActivity.show(this)
     }
 
     override fun onPause() {
+        ArtworkActivity.dim(true)
         sounds.setActive(false)
         keyDirection = null
         axisDirection = null
