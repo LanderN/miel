@@ -49,7 +49,7 @@ constexpr uint64_t kFnvOffset = 1469598103934665603ull, kFnvPrime = 109951162821
 constexpr unsigned kMaxFrameSize = 4096;
 // Audio is held back after a start, pause or underrun until this much is queued.
 constexpr double kAudioPrefillSeconds = 0.05;
-// Fast-forward runs frames this many times as often, without sound.
+// Fast-forward runs frames this many times as often.
 constexpr int kFastForward = 3;
 // Diagnostic sessions checkpoint this often; games only on Home, Back and pause, because
 // Azahar's serialize stalls emulation for most of a second.
@@ -411,15 +411,40 @@ void setupGraphics() {
 
 // Audio.
 
-size_t audio(const int16_t* data, size_t count) {
-    audioFrames += count;
-    if (fastForward) return count;
+// Queues `count` stereo frames for output, dropping those that do not fit.
+void push(const int16_t* data, size_t count) {
     size_t write = audioWrite.load(std::memory_order_relaxed);
     size_t space = audioRing.size() - (write - audioRead.load(std::memory_order_acquire));
     size_t samples = std::min(count * 2, space);
     audioDropped += count - samples / 2;
     for (size_t i = 0; i < samples; i++) audioRing[(write + i) % audioRing.size()] = data[i];
     audioWrite.store(write + samples, std::memory_order_release);
+}
+
+// During fast-forward, each kFastForward frames are averaged into one, raising the pitch.
+size_t audio(const int16_t* data, size_t count) {
+    audioFrames += count;
+    if (!fastForward) {
+        push(data, count);
+        return count;
+    }
+    static int32_t sum[2];
+    static int summed = 0;
+    int16_t out[512];
+    size_t frames = 0;
+    for (size_t i = 0; i < count; i++) {
+        sum[0] += data[i * 2];
+        sum[1] += data[i * 2 + 1];
+        if (++summed < kFastForward) continue;
+        out[frames * 2] = int16_t(sum[0] / kFastForward);
+        out[frames * 2 + 1] = int16_t(sum[1] / kFastForward);
+        sum[0] = sum[1] = summed = 0;
+        if (++frames == 256) {
+            push(out, frames);
+            frames = 0;
+        }
+    }
+    push(out, frames);
     return count;
 }
 

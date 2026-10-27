@@ -92,7 +92,7 @@ During play, touch the dimmed lower screen to brighten it; it dims again after e
 of inactivity.
 
 On systems that use one screen, the lower screen's **Fast-forward** switch runs the game at triple
-speed without sound, and **Library** saves your place and returns.
+speed, and **Library** saves your place and returns.
 
 PSP games run on the upper screen with 2× rendering resolution by default and left-stick controls.
 Keep ISO, CSO, PBP, CHD, ELF or PRX files in a `PSP` or `PlayStation Portable` folder;
