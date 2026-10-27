@@ -9,6 +9,7 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <jni.h>
+#include <sys/system_properties.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 
@@ -160,6 +161,10 @@ retro_frame_time_callback frameTime{};
 retro_audio_callback asyncAudio{};
 std::map<std::string, std::string> variables;
 bool hasGame = false, initialized = false, hwStarted = false;
+// A core that requests a GL context during play gets context_reset after the current retro_run.
+bool contextResetPending = false;
+// `adb shell setprop debug.miel.option.<key> <value>` overrides a core option during play.
+bool variablesChanged = false;
 
 // Interleaved stereo samples from the core (producer) to the AAudio callback (consumer).
 // Positions only grow; each side owns one.
@@ -506,6 +511,18 @@ bool rumble(unsigned port, retro_rumble_effect effect, uint16_t strength) {
 
 // The core's environment.
 
+void readOptionOverrides() {
+    for (auto& [key, value] : variables) {
+        char override[PROP_VALUE_MAX] = "";
+        if (__system_property_get(("debug.miel.option." + key).c_str(), override) > 0 &&
+            value != override) {
+            __android_log_print(ANDROID_LOG_INFO, kTag, "Option %s: %s", key.c_str(), override);
+            value = override;
+            variablesChanged = true;
+        }
+    }
+}
+
 const char* defaultValue(const char* value, const char* first) {
     return value ? value : (first ? first : "");
 }
@@ -577,7 +594,8 @@ bool environment(unsigned command, void* data) {
             return variable->value != nullptr;
         }
         case RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE:
-            *static_cast<bool*>(data) = false;
+            *static_cast<bool*>(data) = variablesChanged;
+            variablesChanged = false;
             return true;
         case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY: {
             static std::string path;
@@ -624,6 +642,11 @@ bool environment(unsigned command, void* data) {
             return true;
         case RETRO_ENVIRONMENT_SET_HW_RENDER: {
             auto* request = static_cast<retro_hw_render_callback*>(data);
+            if (request->context_type == RETRO_HW_CONTEXT_NONE && hasGame && !useVulkan) {
+                hw = {};
+                hwStarted = false;
+                return true;
+            }
             if (useVulkan) {
                 if (request->context_type != RETRO_HW_CONTEXT_VULKAN) return false;
                 hw = *request;
@@ -643,6 +666,7 @@ bool environment(unsigned command, void* data) {
             request->get_current_framebuffer = currentFramebuffer;
             request->get_proc_address = procAddress;
             hw = *request;
+            contextResetPending = hasGame;
             return true;
         }
         case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
@@ -1107,6 +1131,13 @@ void loop(const Launch& launch, double fps) {
         api.run();
         uint64_t spent = micros() - start;
         runMicros += spent;
+        if (contextResetPending) {
+            contextResetPending = false;
+            allocateFramebuffer();
+            if (hw.context_reset) hw.context_reset();
+            hwStarted = true;
+        }
+        if (frames % 60 == 0) readOptionOverrides();
         hint.work(spent);
         frames++;
         // Azahar calculates its state size by taking a full snapshot.
