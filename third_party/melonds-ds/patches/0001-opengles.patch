@@ -1,0 +1,119 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 30aefe1..9e53a63 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -77,9 +77,6 @@ set(ENABLE_OGLRENDERER ${ENABLE_OPENGL})
+ set(OPENGL_PROFILE ${DEFAULT_OPENGL_PROFILE} CACHE STRING "OpenGL profile to use if OpenGL is enabled. Valid values are 'OpenGL', 'OpenGLES2', 'OpenGLES3', 'OpenGLES31', and 'OpenGLES32'.")
+ set_property(CACHE OPENGL_PROFILE PROPERTY STRINGS OpenGL OpenGLES2 OpenGLES3)
+ 
+-if (ENABLE_OPENGL AND (NOT OPENGL_PROFILE STREQUAL "OpenGL"))
+-    message(FATAL_ERROR "melonDS does not support OpenGL ES yet")
+-endif()
+ 
+ if (APPLE)
+     # Apple's OpenGL stops at 4.1, but melonDS's compute renderer needs 4.3
+diff --git a/src/libretro/CMakeLists.txt b/src/libretro/CMakeLists.txt
+index d8b1062..0db2756 100644
+--- a/src/libretro/CMakeLists.txt
++++ b/src/libretro/CMakeLists.txt
+@@ -298,6 +298,10 @@ target_compile_definitions(melondsds_libretro PUBLIC
+ 
+ target_compile_definitions(melondsds_libretro PUBLIC MELONDS_GL_HEADER="PlatformOGLPrivate.h")
+ target_compile_definitions(core PUBLIC MELONDS_GL_HEADER="PlatformOGLPrivate.h")
++if (HAVE_OPENGLES)
++    target_compile_definitions(core PUBLIC HAVE_OPENGLES HAVE_OPENGLES3 HAVE_OPENGLES_3)
++    target_link_libraries(core PUBLIC libretro-common)
++endif()
+ 
+ if (WIN32)
+     # melonDS used to set these on its own "core" target with PUBLIC visibility,
+diff --git a/src/libretro/PlatformOGLPrivate.h b/src/libretro/PlatformOGLPrivate.h
+index 8abec16..4ba0038 100644
+--- a/src/libretro/PlatformOGLPrivate.h
++++ b/src/libretro/PlatformOGLPrivate.h
+@@ -223,6 +223,16 @@ RETRO_END_DECLS
+ #define glDepthRange glDepthRangef
+ #define glFramebufferTexture glFramebufferTextureEXT
+ #define glMapBuffer glMapBufferOES
++#define glObjectLabel glObjectLabelKHR
++#ifndef GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER
++#define GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER 0x8CDB
++#endif
++#ifndef GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER
++#define GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER 0x8CDC
++#endif
++#ifndef GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS
++#define GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS 0x8DA8
++#endif
+ 
+ #ifndef GL_READ_ONLY
+ #define GL_READ_ONLY 0x88B8
+@@ -230,8 +240,19 @@ RETRO_END_DECLS
+ 
+ RETRO_BEGIN_DECLS
+ void glDrawBuffer(GLenum buf);
++// OpenGL ES 3.1/3.2 entry points that glsym's ES 3.0 table lacks; libGLESv3 exports them.
++GL_APICALL void GL_APIENTRY glDispatchCompute(GLuint x, GLuint y, GLuint z);
++GL_APICALL void GL_APIENTRY glDispatchComputeIndirect(GLintptr indirect);
++GL_APICALL void GL_APIENTRY glBindImageTexture(GLuint unit, GLuint texture, GLint level,
++    GLboolean layered, GLint layer, GLenum access, GLenum format);
++GL_APICALL void GL_APIENTRY glMemoryBarrier(GLbitfield barriers);
++GL_APICALL void GL_APIENTRY glTexBuffer(GLenum target, GLenum internalformat, GLuint buffer);
+ RETRO_END_DECLS
+ 
++#ifndef GL_CLAMP_TO_BORDER
++#define GL_CLAMP_TO_BORDER 0x812D
++#endif
++
+ #endif
+ 
+ #endif //MELONDS_DS_PLATFORMOGLPRIVATE_H
+diff --git a/src/libretro/glsl/melondsds.vert b/src/libretro/glsl/melondsds.vert
+index b7a6e16..5419015 100644
+--- a/src/libretro/glsl/melondsds.vert
++++ b/src/libretro/glsl/melondsds.vert
+@@ -14,7 +14,7 @@ void main()
+ {
+     vec4 fpos;
+     fpos.xy = ((vPosition * 2.0) / uScreenSize) - 1.0;
+-    fpos.y *= -1;
++    fpos.y *= -1.0;
+     fpos.z = 0.0;
+     fpos.w = 1.0;
+     gl_Position = fpos;
+diff --git a/src/libretro/render/opengl.cpp b/src/libretro/render/opengl.cpp
+index d2aec34..52a0386 100644
+--- a/src/libretro/render/opengl.cpp
++++ b/src/libretro/render/opengl.cpp
+@@ -180,9 +180,15 @@ MelonDsDs::OpenGLRenderState::OpenGLRenderState(RenderMode mode) : _mode(mode) {
+     // Its compute renderer's shaders are "#version 430 core", so that one needs 4.3.
+     // The frontend gets exactly one version request per context,
+     // which is why each render mode gets its own OpenGLRenderState.
++#ifdef HAVE_OPENGLES
++    _hw_render.context_type = RETRO_HW_CONTEXT_OPENGLES_VERSION;
++    _hw_render.version_major = 3;
++    _hw_render.version_minor = 2;
++#else
+     _hw_render.context_type = RETRO_HW_CONTEXT_OPENGL_CORE;
+     _hw_render.version_major = LEGACY_GL_VERSION.first;
+     _hw_render.version_minor = LEGACY_GL_VERSION.second;
++#endif
+ #ifdef HAVE_COMPUTE_RENDERER
+     if (UsesComputeRenderer()) {
+         _hw_render.version_major = COMPUTE_GL_VERSION.first;
+@@ -247,6 +253,7 @@ void MelonDsDs::OpenGLRenderState::ContextReset(melonDS::NDS& nds, const CoreCon
+         throw opengl_not_initialized_exception();
+     }
+ 
++#if defined(HAVE_OPENGL) && !defined(HAVE_OPENGLES)
+     // The core doesn't link against OpenGL,
+     // so the OpenGL 1.0/1.1 functions that glsym doesn't cover
+     // must be resolved before we make our first OpenGL call
+@@ -270,6 +277,7 @@ void MelonDsDs::OpenGLRenderState::ContextReset(melonDS::NDS& nds, const CoreCon
+         retro::error("Frontend couldn't resolve {} OpenGL functions, can't use the OpenGL renderer", missingSymbols);
+         throw opengl_not_initialized_exception();
+     }
++#endif
+ 
+     // Now resolve everything else that glsym knows about
+     rglgen_resolve_symbols(_hw_render.get_proc_address);

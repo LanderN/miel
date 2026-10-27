@@ -105,6 +105,20 @@ val Core.settingOptions: List<CoreOption>
                     ),
                     toggle("melonds_threaded_renderer", "Threaded software rendering", true),
                     CoreOption(
+                        "melonds_render_mode",
+                        "Renderer",
+                        listOf("software", "opengl"),
+                        listOf("Software", "OpenGL"),
+                        "opengl",
+                    ),
+                    CoreOption(
+                        "melonds_opengl_resolution",
+                        "Internal resolution",
+                        listOf("1", "2", "3", "4"),
+                        listOf("1×", "2×", "3×", "4×"),
+                        "4",
+                    ),
+                    CoreOption(
                         "melonds_slot2_device",
                         "Slot-2 device",
                         listOf("auto", "rumble-pak", "expansion-pak"),

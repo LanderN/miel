@@ -59,7 +59,8 @@ if [ "$target" != release ]; then
 fi
 
 # Builds the libretro core in third_party/<name> for arm64 from the source archive its manifest pins,
-# with its patches applied, and packages <output>.so as lib<package>.so. The build is redone when the
+# with its patches applied, and packages <output>.so as lib<package>.so. melonDS DS builds melonDS
+# from the archive at melonds_source_url with melonds-patches applied. The build is redone when an
 # archive or the patches change. Further arguments go to CMake.
 core_sources=()
 core() {
@@ -68,6 +69,8 @@ core() {
     local manifest=third_party/$name/manifest.json patches
     field() { sed -n "s/.*\"$1\": \"\(.*\)\".*/\1/p" "$manifest"; }
     patches=$(ls "third_party/$name/patches/"*.patch 2>/dev/null || true)
+    local dependency_patches
+    dependency_patches=$(ls "third_party/$name/melonds-patches/"*.patch 2>/dev/null || true)
     local url core_ndk cmake_bin src built
     url=$(field source_url)
     core_ndk=$ANDROID_HOME/ndk/$(field android_ndk)
@@ -78,7 +81,8 @@ core() {
     fi
     src=$PWD/.tools/$name/src-$({
         field source_sha256
-        cat $patches /dev/null
+        field melonds_sha256
+        cat $patches $dependency_patches /dev/null
     } | shasum -a 256 | cut -c1-12)
     core_sources+=("$src")
     built=$(find "$src/build" -name "$output.so" 2>/dev/null | head -1 || true)
@@ -92,6 +96,16 @@ core() {
         mkdir -p "$src"
         tar -xf "$tarball" -C "$src" --strip-components 1
         for p in $patches; do patch -d "$src" -p1 --quiet <"$p"; done
+        if [ "$name" = melonds-ds ]; then
+            local melonds_tarball=.tools/$name/melonds-$(field melonds_sha256 | cut -c1-12).tar.gz
+            [ -f "$melonds_tarball" ] || curl -fL -o "$melonds_tarball" "$(field melonds_source_url)"
+            echo "$(field melonds_sha256)  $melonds_tarball" | shasum -a 256 -c - >/dev/null ||
+                die "melonDS source hash mismatch"
+            mkdir -p "$src/melonds"
+            tar -xf "$melonds_tarball" -C "$src/melonds" --strip-components 1
+            for p in $dependency_patches; do patch -d "$src/melonds" -p1 --quiet <"$p"; done
+            set -- "$@" -DFETCHCONTENT_SOURCE_DIR_MELONDS="$src/melonds"
+        fi
         if [ "$(field build_system)" = ndk ]; then
             local android_mk=$src/$(field android_mk)
             "$core_ndk/ndk-build" -C "$src/$(field build_subdir)" \
@@ -128,9 +142,7 @@ if [ "$abi" = arm64-v8a ]; then
     export GIT_CEILING_DIRECTORIES=$PWD/.tools
     core azahar azahar_libretro azahar_libretro -DENABLE_LIBRETRO=ON -DANDROID_PLATFORM=android-21
     core melonds-ds melondsds_libretro_android melondsds_libretro -DANDROID_PLATFORM=android-29 \
-        -DCMAKE_BUILD_TYPE=Release -DENABLE_OPENGL=OFF \
-        -DMELONDS_REPOSITORY_TAG="$(sed -n 's/.*"melonds_commit": "\(.*\)".*/\1/p' \
-            third_party/melonds-ds/manifest.json)"
+        -DCMAKE_BUILD_TYPE=Release -DENABLE_OPENGL=ON -DOPENGL_PROFILE=OpenGLES3
     core mgba mgba_libretro mgba_libretro -DANDROID_PLATFORM=android-29 -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_LIBRETRO=ON -DSKIP_LIBRARY=ON -DBUILD_SHARED=OFF -DBUILD_STATIC=OFF -DBUILD_QT=OFF \
         -DBUILD_SDL=OFF -DUSE_FFMPEG=OFF -DUSE_ZLIB=OFF -DUSE_MINIZIP=OFF -DUSE_LIBZIP=OFF \

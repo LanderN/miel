@@ -6,9 +6,18 @@
   "source_url": "https://github.com/JesseTG/melonds-ds/archive/refs/tags/v1.4.0.tar.gz",
   "source_sha256": "034b3aa856b2a194de1653a55eca74b530b7bd5e2e39dcd23f0d35c8c0410406",
   "melonds_commit": "16f127dbb587a73371827ce79689c5d237c4b59b",
+  "melonds_source_url": "https://github.com/JesseTG/melonDS/archive/16f127dbb587a73371827ce79689c5d237c4b59b.tar.gz",
+  "melonds_sha256": "618354a6853be72f7777c36914139405fb17e1058454f4af8eea3ac04871676e",
   "android_ndk": "29.0.14206865",
   "android_cmake": "3.30.3",
   "license": "GPL-3.0-or-later; see upstream source for per-file and dependency notices",
   "license_copy": "android/app/src/main/assets/notices/melonds-ds-1.4.0-license.txt",
-  "notes": "Built from the release source with the OpenGL renderer off, packaged as libmelondsds_libretro.so. CMake fetches its dependencies at the commits the release names; melonds_commit pins melonDS itself, which the release tracks by branch. Uses melonDS's built-in BIOS and firmware unless dumps are in the system folder. No BIOS, firmware or ROMs bundled."
+  "notes": "Built from the release source with its patches and the OpenGL ES 3 renderer, packaged as libmelondsds_libretro.so. CMake fetches its dependencies at the commits the release names, except melonDS itself, which builds from melonds_source_url with melonds-patches applied (OpenGL ES 3.2 support and an ARM fix for split-polygon texture coordinates). Uses melonDS's built-in BIOS and firmware unless dumps are in the system folder. No BIOS, firmware or ROMs bundled.",
+  "patches": [
+    "patches/0001-opengles.patch"
+  ],
+  "melonds_patches": [
+    "melonds-patches/0001-opengles.patch",
+    "melonds-patches/0002-arm-centre-texcoords.patch"
+  ]
 }

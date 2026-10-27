@@ -1,0 +1,15 @@
+diff --git a/src/GPU3D_OpenGL.cpp b/src/GPU3D_OpenGL.cpp
+index 2823850c..925eda5b 100644
+--- a/src/GPU3D_OpenGL.cpp
++++ b/src/GPU3D_OpenGL.cpp
+@@ -719,7 +719,9 @@ void GLRenderer3D::BuildPolygons(GLRenderer3D::RendererPolygon* polygons, int np
+                           ((u32)cB << 16) |
+                           (alpha << 24);
+ 
+-                *vptr++ = (u16)cS | ((u16)cT << 16);
++                // Negative coordinates wrap through s32; a direct float-to-u16 conversion clamps them
++                // to 0 on ARM.
++                *vptr++ = (u16)(s32)cS | ((u32)(u16)(s32)cT << 16);
+ 
+                 *vptr++ = vtxattr | (zshift << 16);
+                 *vptr++ = curtexlayer;
