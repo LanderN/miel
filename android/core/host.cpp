@@ -49,8 +49,6 @@ constexpr uint64_t kFnvOffset = 1469598103934665603ull, kFnvPrime = 109951162821
 constexpr unsigned kMaxFrameSize = 4096;
 // Audio is held back after a start, pause or underrun until this much is queued.
 constexpr double kAudioPrefillSeconds = 0.05;
-// Fast-forward runs frames this many times as often.
-constexpr int kFastForward = 3;
 // Diagnostic sessions checkpoint this often; games only on Home, Back and pause, because
 // Azahar's serialize stalls emulation for most of a second.
 constexpr auto kDiagnosticCheckpoint = std::chrono::milliseconds(1500);
@@ -105,7 +103,10 @@ std::atomic<int> requestedDisc{-1}, requestedAnalog{-1};
 std::atomic<bool> analogEnabled{true};
 std::atomic<unsigned> discCount{0}, discIndex{0};
 std::atomic<bool> discFailed{false};
-std::atomic<bool> fastForward{false};
+std::atomic<bool> fastForward{false}, fastForwardSound{true};
+std::atomic<int> fastForwardSpeed{3};
+// Frames run per frame period, measured over recent frames.
+std::atomic<double> speed{1};
 
 // The session's state, reported to Java.
 std::atomic<bool> ready{false}, restored{false}, restoredBackup{false}, restoreBlocked{false},
@@ -421,23 +422,33 @@ void push(const int16_t* data, size_t count) {
     audioWrite.store(write + samples, std::memory_order_release);
 }
 
-// During fast-forward, each kFastForward frames are averaged into one, raising the pitch.
+// During fast-forward, consecutive frames are averaged into one at the measured speed, raising the
+// pitch. The ratio leans on the queue's fill so output neither runs dry nor overflows.
 size_t audio(const int16_t* data, size_t count) {
     audioFrames += count;
     if (!fastForward) {
         push(data, count);
         return count;
     }
+    if (!fastForwardSound) return count;
+    size_t queued =
+        (audioWrite.load(std::memory_order_relaxed) - audioRead.load(std::memory_order_acquire)) /
+        2;
+    double fill = double(queued) / std::max<size_t>(audioPrefill, 1);
+    double step = std::max(1., speed.load()) * std::clamp(.75 + .25 * fill, .8, 1.25);
     static int32_t sum[2];
     static int summed = 0;
+    static double phase = 0;
     int16_t out[512];
     size_t frames = 0;
     for (size_t i = 0; i < count; i++) {
         sum[0] += data[i * 2];
         sum[1] += data[i * 2 + 1];
-        if (++summed < kFastForward) continue;
-        out[frames * 2] = int16_t(sum[0] / kFastForward);
-        out[frames * 2 + 1] = int16_t(sum[1] / kFastForward);
+        summed++;
+        if (++phase < step) continue;
+        phase -= step;
+        out[frames * 2] = int16_t(sum[0] / summed);
+        out[frames * 2 + 1] = int16_t(sum[1] / summed);
         sum[0] = sum[1] = summed = 0;
         if (++frames == 256) {
             push(out, frames);
@@ -1077,7 +1088,7 @@ void loop(const Launch& launch, double fps) {
     const auto interval = kDiagnosticCheckpoint;
     const auto period =
         std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(1. / fps));
-    auto next = Clock::now(), checkpointDue = next + interval;
+    auto next = Clock::now(), checkpointDue = next + interval, lastFrame = next;
     std::future<bool> writing;
     bool writingExit = false, writingPeriodic = false;
     uint64_t writeStart = 0, writingFrame = 0;
@@ -1148,7 +1159,7 @@ void loop(const Launch& launch, double fps) {
         if (ready &&
             (paused || (useVulkan ? !vulkan.visible(0) : outputs[0].surface == EGL_NO_SURFACE))) {
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
-            next = Clock::now();
+            next = lastFrame = Clock::now();
             continue;
         }
         if (frameTime.callback) frameTime.callback(retro_usec_t(1000000. / fps));
@@ -1175,7 +1186,7 @@ void loop(const Launch& launch, double fps) {
             checkpointDue = Clock::now() + interval;
         }
         // Pace without vsync; after a stall of over 100 ms, start counting again from now.
-        next += fastForward ? period / kFastForward : period;
+        next += fastForward ? period / fastForwardSpeed.load() : period;
         if (next > Clock::now()) {
             uint64_t sleepStart = micros();
             std::this_thread::sleep_until(next);
@@ -1183,6 +1194,12 @@ void loop(const Launch& launch, double fps) {
         } else if (Clock::now() - next > std::chrono::milliseconds(100)) {
             next = Clock::now();
         }
+        auto now = Clock::now();
+        if (now > lastFrame) {
+            double measured = std::chrono::duration<double>(period) / (now - lastFrame);
+            speed = speed + .05 * (std::min(measured, 16.) - speed);
+        }
+        lastFrame = now;
         stats.frame(spent);
     }
     if (writing.valid()) finishSave(writing.get());
@@ -1403,6 +1420,7 @@ extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_start(
     analogEnabled = true;
     discFailed = false;
     fastForward = false;
+    speed = 1;
     hw = {};
     frameTime = {};
     asyncAudio = {};
@@ -1430,7 +1448,11 @@ extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_analog(JN
 }
 
 extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_fastForward(JNIEnv*, jclass,
-                                                                                   jboolean on) {
+                                                                                   jboolean on,
+                                                                                   jint maximum,
+                                                                                   jboolean sound) {
+    fastForwardSpeed = std::clamp(int(maximum), 2, 8);
+    fastForwardSound = sound;
     fastForward = on;
 }
 
@@ -1530,6 +1552,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_github_landern_miel_CoreHost_report
         .add("inputEvents", inputEvents.load())
         .add("analogEnabled", analogEnabled.load())
         .add("fastForward", fastForward.load())
+        .add("speed", speed.load())
         .add("analogPolls", analogPolls.load())
         .add("analogPeak", analogPeak.load())
         .add("rumbleRequests", rumbleRequests.load())

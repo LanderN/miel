@@ -84,6 +84,10 @@ class CoreActivity : Activity() {
     private var discIndex = 0
     private var analogEnabled = true
     private var fastForward = false
+    private var fastForwardKey = KeyEvent.KEYCODE_UNKNOWN
+    private var fastForwardToggles = false
+    private var fastForwardSpeed = 3
+    private var fastForwardSound = true
 
     /** Back shows PlayControls over a dual-screen game's lower screen, paused. */
     private var popup = false
@@ -125,6 +129,21 @@ class CoreActivity : Activity() {
                 .getBoolean(intent.getStringExtra(EXTRA_ROM_URI).orEmpty(), true)
         debugReports = debuggable && intent.getBooleanExtra(EXTRA_DEBUG_REPORTS, false)
         framePath = intent.getStringExtra(EXTRA_FRAME).orEmpty()
+        val fastForwardSettings =
+            intent.getStringArrayExtra(EXTRA_FAST_FORWARD).orEmpty().toList().chunked(2).associate {
+                it[0] to it[1]
+            }
+        fastForwardKey =
+            when (fastForwardSettings["button"]) {
+                "l2" -> KeyEvent.KEYCODE_BUTTON_L2
+                "r2" -> KeyEvent.KEYCODE_BUTTON_R2
+                "l3" -> KeyEvent.KEYCODE_BUTTON_THUMBL
+                "r3" -> KeyEvent.KEYCODE_BUTTON_THUMBR
+                else -> KeyEvent.KEYCODE_UNKNOWN
+            }
+        fastForwardToggles = fastForwardSettings["mode"] == "toggle"
+        fastForwardSpeed = fastForwardSettings["speed"]?.toIntOrNull() ?: 3
+        fastForwardSound = fastForwardSettings["sound"] != "off"
         if (!diagnostic && !probe) gameId = intent.getStringExtra(EXTRA_GAME_ID).orEmpty()
         played = PlayTime.played(this, gameId)
 
@@ -183,9 +202,8 @@ class CoreActivity : Activity() {
                     CoreHost.analog(analogEnabled)
                 },
                 toggleFastForward = {
-                    fastForward = !fastForward
                     wakeLower()
-                    CoreHost.fastForward(fastForward)
+                    setFastForward(!fastForward)
                 },
                 leave = ::returnToLibrary,
                 resume = { showPopup(false) },
@@ -646,6 +664,11 @@ class CoreActivity : Activity() {
             .show()
     }
 
+    private fun setFastForward(on: Boolean) {
+        fastForward = on
+        CoreHost.fastForward(on, fastForwardSpeed, fastForwardSound)
+    }
+
     private fun showPopup(show: Boolean) {
         if (show == popup || (show && (closing || saveFailureShown))) return
         popup = show
@@ -826,6 +849,14 @@ class CoreActivity : Activity() {
         if (MediaVolume.key(this, event)) return true
         if (playControls.key(event)) return true
         val key = event.keyCode
+        if (key == fastForwardKey) {
+            if (!closing && !saveFailureShown && event.repeatCount == 0) {
+                val down = event.action == KeyEvent.ACTION_DOWN
+                if (!fastForwardToggles) setFastForward(down)
+                else if (down) setFastForward(!fastForward)
+            }
+            return true
+        }
         if (popup && key == KeyEvent.KEYCODE_BUTTON_B) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) showPopup(false)
             return true
@@ -873,14 +904,18 @@ class CoreActivity : Activity() {
             event.getAxisValue(MotionEvent.AXIS_RZ),
             if (core.stickDrivesDpad && hatX == 0f) stickX else hatX,
             if (core.stickDrivesDpad && hatY == 0f) stickY else hatY,
-            maxOf(
-                event.getAxisValue(MotionEvent.AXIS_LTRIGGER),
-                event.getAxisValue(MotionEvent.AXIS_BRAKE),
-            ),
-            maxOf(
-                event.getAxisValue(MotionEvent.AXIS_RTRIGGER),
-                event.getAxisValue(MotionEvent.AXIS_GAS),
-            ),
+            if (fastForwardKey == KeyEvent.KEYCODE_BUTTON_L2) 0f
+            else
+                maxOf(
+                    event.getAxisValue(MotionEvent.AXIS_LTRIGGER),
+                    event.getAxisValue(MotionEvent.AXIS_BRAKE),
+                ),
+            if (fastForwardKey == KeyEvent.KEYCODE_BUTTON_R2) 0f
+            else
+                maxOf(
+                    event.getAxisValue(MotionEvent.AXIS_RTRIGGER),
+                    event.getAxisValue(MotionEvent.AXIS_GAS),
+                ),
         )
         return true
     }
@@ -911,6 +946,9 @@ class CoreActivity : Activity() {
         const val EXTRA_FRAME = "frame"
         const val EXTRA_FRESH = "fresh"
         const val EXTRA_OPTIONS = "coreOptions"
+
+        /** Session.fastForward as key and value pairs. */
+        const val EXTRA_FAST_FORWARD = "fastForward"
         const val EXTRA_RESOLUTION = "resolution"
         const val EXTRA_HARDWARE_SHADERS = "hardwareShaders"
 

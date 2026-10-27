@@ -391,3 +391,25 @@ fun CoreSettings.options(): Map<String, String> =
 /** Settings rows, including actions that apply to the whole core. */
 fun Core.settingIndices(perGame: Boolean): IntRange =
     0 until settingOptions.size + if (this == Core.AZAHAR && !perGame) 1 else 0
+
+/** Fast-forward settings, kept with the core defaults under FAST_FORWARD. */
+val FAST_FORWARD_OPTIONS =
+    listOf(
+        CoreOption(
+            "button",
+            "Button",
+            listOf("off", "l2", "r2", "l3", "r3"),
+            listOf("Off", "L2", "R2", "L3", "R3"),
+        ),
+        CoreOption("mode", "Button mode", listOf("hold", "toggle"), listOf("Hold", "Toggle")),
+        CoreOption(
+            "speed",
+            "Maximum speed",
+            listOf("2", "3", "4", "6", "8"),
+            listOf("2×", "3×", "4×", "6×", "8×"),
+            "3",
+        ),
+        CoreOption("sound", "Sound", listOf("on", "off"), listOf("On", "Off")),
+    )
+
+const val FAST_FORWARD = "FAST_FORWARD"

@@ -425,6 +425,11 @@ class LibraryActivity : ComponentActivity() {
                     Command.Left,
                     Command.Right ->
                         if (overlay.core != null) change(if (command == Command.Left) -1 else 1)
+                        else if (overlay.selected in FAST_FORWARD_START until CORE_SETTINGS_START)
+                            changeFastForward(
+                                overlay.selected - FAST_FORWARD_START,
+                                if (command == Command.Left) -1 else 1,
+                            )
                         else if (overlay.selected == 0)
                             session.setGameRows(if (command == Command.Left) 1 else 2)
                     is Command.Pick -> choose(command.index)
@@ -567,7 +572,14 @@ class LibraryActivity : ComponentActivity() {
         sounds.play(Cue.OPEN)
     }
 
+    private fun changeFastForward(index: Int, step: Int) {
+        session.changeFastForward(index, step)
+        sounds.play(if (session.error.isEmpty()) Cue.CONFIRM else Cue.ERROR)
+    }
+
     private fun settingChosen(choice: Int) {
+        if (choice in FAST_FORWARD_START until CORE_SETTINGS_START)
+            return changeFastForward(choice - FAST_FORWARD_START, 1)
         Core.entries.getOrNull(choice - CORE_SETTINGS_START)?.let {
             overlay = Overlay.Settings(core = it)
             sounds.play(Cue.OPEN)
@@ -1066,6 +1078,10 @@ class LibraryActivity : ComponentActivity() {
                 .putExtra(CoreActivity.EXTRA_FRAME, frame.path)
                 .putExtra(CoreActivity.EXTRA_FRESH, fresh)
                 .putExtra(CoreActivity.EXTRA_OPTIONS, session.launchOptions(core))
+                .putExtra(
+                    CoreActivity.EXTRA_FAST_FORWARD,
+                    session.fastForward.flatMap { listOf(it.key, it.value) }.toTypedArray(),
+                )
                 .putExtra(
                     CoreActivity.EXTRA_DEBUG_REPORTS,
                     intent.getBooleanExtra(CoreActivity.EXTRA_DEBUG_REPORTS, false),

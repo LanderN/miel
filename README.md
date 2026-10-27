@@ -91,8 +91,10 @@ for each game. **L1 + R1 + Select** toggles the DualShock’s Analog mode when a
 During play, touch the dimmed lower screen to brighten it; it dims again after eight seconds
 of inactivity.
 
-On systems that use one screen, the lower screen's **Fast-forward** switch runs the game at triple
-speed, and **Library** saves your place and returns.
+On systems that use one screen, the lower screen's **Fast-forward** switch speeds the game up,
+and **Library** saves your place and returns. **Settings → Fast-forward** sets a controller button
+that fast-forwards while held or toggles it, the maximum speed, and whether the game's sound plays
+along, faster and higher.
 
 PSP games run on the upper screen with 2× rendering resolution by default and left-stick controls.
 Keep ISO, CSO, PBP, CHD, ELF or PRX files in a `PSP` or `PlayStation Portable` folder;

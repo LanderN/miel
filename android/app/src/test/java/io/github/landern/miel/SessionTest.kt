@@ -110,6 +110,19 @@ class SessionTest {
     }
 
     @Test
+    fun fastForwardSettingsCycleAndPersist() {
+        val s = open()
+        assertEquals(
+            mapOf("button" to "off", "mode" to "hold", "speed" to "3", "sound" to "on"),
+            s.fastForward,
+        )
+        s.changeFastForward(0, -1)
+        s.changeFastForward(2, 1)
+        assertEquals("r3", open().fastForward["button"])
+        assertEquals("4", open().fastForward["speed"])
+    }
+
+    @Test
     fun failedWritesUndoTheChange() {
         File(dir, "blocker").writeText("blocked")
         val s = open(path = File(dir, "blocker/sessions-v1.json"))

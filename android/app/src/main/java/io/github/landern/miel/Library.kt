@@ -140,10 +140,12 @@ val SETTINGS =
         "RomM",
         "Redownload metadata",
     ) +
+        FAST_FORWARD_OPTIONS.map { it.label } +
         Core.entries.map { it.coreName } +
         listOf("Remove downloaded art", "Set as default launcher", "miel updates", "Licenses")
 
-const val CORE_SETTINGS_START = 6
+const val FAST_FORWARD_START = 6
+const val CORE_SETTINGS_START = FAST_FORWARD_START + 4
 
 /** A dialog over the library that is not part of the session. */
 sealed interface Overlay {
@@ -1030,7 +1032,8 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
     val groups =
         if (core == null)
             listOf(
-                "Library" to (0 until CORE_SETTINGS_START),
+                "Library" to (0 until FAST_FORWARD_START),
+                "Fast-forward" to (FAST_FORWARD_START until CORE_SETTINGS_START),
                 "Emulators" to (CORE_SETTINGS_START until CORE_SETTINGS_START + Core.entries.size),
                 "Device & storage" to (CORE_SETTINGS_START + Core.entries.size..SETTINGS.lastIndex),
             )
@@ -1113,8 +1116,11 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
                 ) {
                     indices.forEach { i ->
                         val option = options.getOrNull(i)
+                        val fastForward = FAST_FORWARD_OPTIONS.getOrNull(i - FAST_FORWARD_START)
                         val value =
-                            if (core != null && option != null) {
+                            if (core == null && fastForward != null)
+                                fastForward.label(session.fastForward.getValue(fastForward.key))
+                            else if (core != null && option != null) {
                                 val current =
                                     session.optionValues(core, overlay.perGame).getValue(option.key)
                                 if (overlay.perGame && option.key !in session.gameOverrides())
@@ -1157,7 +1163,13 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
                 "A",
                 if (core == Core.AZAHAR && !overlay.perGame && overlay.selected == options.size)
                     "Clear"
-                else if (core != null || overlay.selected == 0) "Change" else "Select",
+                else if (
+                    core != null ||
+                        overlay.selected == 0 ||
+                        overlay.selected in FAST_FORWARD_START until CORE_SETTINGS_START
+                )
+                    "Change"
+                else "Select",
             ) {
                 command(Command.A)
             }

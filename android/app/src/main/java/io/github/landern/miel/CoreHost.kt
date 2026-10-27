@@ -66,8 +66,11 @@ object CoreHost {
     /** Selects a disc from the loaded playlist between core frames. */
     @JvmStatic external fun changeDisc(index: Int)
 
-    /** Runs the game at triple speed, its sound faster and higher. */
-    @JvmStatic external fun fastForward(on: Boolean)
+    /**
+     * Runs the game at up to `speed` times its rate; with `sound`, its audio plays faster and
+     * higher.
+     */
+    @JvmStatic external fun fastForward(on: Boolean, speed: Int, sound: Boolean)
 
     /** The stronger port-zero rumble motor, from 0 to 65535; zero while paused or stopped. */
     @JvmStatic external fun rumble(): Int
