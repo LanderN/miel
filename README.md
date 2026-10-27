@@ -27,7 +27,8 @@ Demo library with homebrew artwork, captured in the emulator. [Game and artwork 
   you last played within reach, without managing save-state slots. Favorites keeps the ones you
   pick, and each game shows its play time.
 - **The lower screen while you play.** Games on one screen show their art, play time, the time and
-  battery below, with fast-forward and a way back to the library.
+  battery below, with fast-forward and a way back to the library. On DS and 3DS, **Back** brings
+  it up over the game.
 - **Local files or RomM.** Choose a ROM folder, connect your self-hosted [RomM](https://romm.app)
   library, or use both. RomM games download the first time you play; in-game saves sync before
   launch and upload when you return to the library. If both copies changed, choose which to keep.
@@ -133,8 +134,9 @@ when they contain games. Add a game to Favorites from **X → More**.
 Drag the tiles horizontally to scroll. Tap a game to select it, then tap it again or press
 **Play** or **Continue** to launch it; tap an app to open it.
 
-During a game, **Home** or Android's **Back** saves your place and returns to
-the library.
+During a game, **Home** saves your place and returns to the library. Android's **Back** does the
+same on one-screen systems; on DS and 3DS it pauses the game and shows the lower-screen panel, with
+fast-forward and **Library**. Press **Back** or **B**, or tap **Resume**, to keep playing.
 
 ## Azahar improvements
 

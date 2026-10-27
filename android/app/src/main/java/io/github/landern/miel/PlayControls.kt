@@ -37,6 +37,7 @@ class PlayControls(
     private val toggleAnalog: () -> Unit,
     private val toggleFastForward: () -> Unit,
     private val leave: () -> Unit,
+    resume: () -> Unit,
 ) : FrameLayout(context) {
     private val cream = 0xfff5efe4.toInt()
     private val surface = 0xfffffaf1.toInt()
@@ -59,6 +60,7 @@ class PlayControls(
     private val played = label("", 14f)
     private val battery = label("", 14f)
     private var batteryAt = 0L
+    private val resumeButton = action(null, "Resume", true) { resume() }
     private val discRow = LinearLayout(context)
     private val divider = View(context)
     private val analogRow = LinearLayout(context)
@@ -76,6 +78,7 @@ class PlayControls(
 
     init {
         visibility = GONE
+        isClickable = true
         setBackgroundColor(0xff3f3024.toInt())
         art.scaleType = ImageView.ScaleType.CENTER_CROP
         addView(art, LayoutParams(MATCH_PARENT, MATCH_PARENT))
@@ -109,6 +112,10 @@ class PlayControls(
             },
         )
         bar.addView(action(null, "Library", false) { leave() })
+        bar.addView(
+            resumeButton,
+            LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginStart = dp(8) },
+        )
         addView(bar, LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP))
 
         val column = LinearLayout(context)
@@ -178,11 +185,15 @@ class PlayControls(
 
     fun art(bitmap: Bitmap) = art.setImageBitmap(bitmap)
 
-    /** `played` is the game's total play time in milliseconds. */
+    /**
+     * `played` is the game's total play time in milliseconds. A `popup` covers a dual-screen game's
+     * lower screen and offers Resume.
+     */
     fun update(
         count: Int,
         index: Int,
         ready: Boolean,
+        popup: Boolean,
         failed: Boolean,
         showAnalog: Boolean,
         analogEnabled: Boolean,
@@ -192,6 +203,7 @@ class PlayControls(
         this.count = count
         this.index = index
         visibility = if (ready) VISIBLE else GONE
+        resumeButton.visibility = if (popup) VISIBLE else GONE
         discRow.visibility = if (count > 1) VISIBLE else GONE
         divider.visibility = if (count > 1 && showAnalog) VISIBLE else GONE
         analogRow.visibility = if (showAnalog) VISIBLE else GONE

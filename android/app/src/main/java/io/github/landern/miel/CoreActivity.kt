@@ -84,6 +84,15 @@ class CoreActivity : Activity() {
     private var discIndex = 0
     private var analogEnabled = true
     private var fastForward = false
+
+    /** Back shows PlayControls over a dual-screen game's lower screen, paused. */
+    private var popup = false
+    private var ready = false
+
+    /** The game stays paused while the disc chooser or the popup is open. */
+    private val holding
+        get() = playControls.isOpen || popup
+
     private lateinit var upper: SurfaceView
 
     /** Play time already in PlayTime, and play since then, counted while the game runs. */
@@ -161,7 +170,7 @@ class CoreActivity : Activity() {
                 },
                 dismissed = {
                     wakeLower()
-                    if (resumed && !closing && !saveFailureShown) CoreHost.pause(false)
+                    if (resumed && !closing && !saveFailureShown && !popup) CoreHost.pause(false)
                 },
                 insert = { CoreHost.changeDisc(it) },
                 toggleAnalog = {
@@ -179,6 +188,7 @@ class CoreActivity : Activity() {
                     CoreHost.fastForward(fastForward)
                 },
                 leave = ::returnToLibrary,
+                resume = { showPopup(false) },
             )
         lowerRoot.addView(playControls, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         lowerDimmer =
@@ -521,12 +531,14 @@ class CoreActivity : Activity() {
                 !lowerTouched &&
                 SystemClock.uptimeMillis() >= lowerInteractionUntil,
         )
+        ready = info.optBoolean("ready")
         discCount = info.optInt("discCount")
         discIndex = info.optInt("discIndex")
         playControls.update(
             discCount,
             discIndex,
-            info.optBoolean("ready") && !closing && !core.dual && !diagnostic,
+            ready && !closing && !diagnostic && (!core.dual || popup),
+            popup,
             info.optBoolean("discFailed"),
             core == Core.PCSX && !diagnostic,
             analogEnabled,
@@ -545,7 +557,7 @@ class CoreActivity : Activity() {
             saveFailureShown = false
             if (resumeAfterSave) {
                 resumeAfterSave = false
-                if (resumed && !closing && !playControls.isOpen) CoreHost.pause(false)
+                if (resumed && !closing && !holding) CoreHost.pause(false)
             }
         }
         if (diagnostic || probe || reportTest || debugReports) writeReport(info)
@@ -628,10 +640,20 @@ class CoreActivity : Activity() {
             }
             .setNegativeButton("Keep playing") { _, _ ->
                 saveFailureShown = false
-                if (!playControls.isOpen) CoreHost.pause(false)
+                if (!holding) CoreHost.pause(false)
             }
             .setCancelable(false)
             .show()
+    }
+
+    private fun showPopup(show: Boolean) {
+        if (show == popup || (show && (closing || saveFailureShown))) return
+        popup = show
+        wakeLower()
+        playControls.visibility = if (show) View.VISIBLE else View.GONE
+        if (show) CoreHost.pause(true)
+        else if (resumed && !closing && !saveFailureShown && !playControls.isOpen)
+            CoreHost.pause(false)
     }
 
     private fun wakeLower() {
@@ -688,7 +710,7 @@ class CoreActivity : Activity() {
 
     private fun resumeSession() {
         main.removeCallbacks(backgroundExit)
-        if (started && !closing && !saveFailureShown && !screenSleeping() && !playControls.isOpen)
+        if (started && !closing && !saveFailureShown && !screenSleeping() && !holding)
             CoreHost.pause(false)
     }
 
@@ -765,7 +787,11 @@ class CoreActivity : Activity() {
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        if (playControls.isOpen) playControls.close() else returnToLibrary()
+        when {
+            playControls.isOpen -> playControls.close()
+            core.dual && !diagnostic && ready && !closing -> showPopup(!popup)
+            else -> returnToLibrary()
+        }
     }
 
     override fun onResume() {
@@ -800,6 +826,10 @@ class CoreActivity : Activity() {
         if (MediaVolume.key(this, event)) return true
         if (playControls.key(event)) return true
         val key = event.keyCode
+        if (popup && key == KeyEvent.KEYCODE_BUTTON_B) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) showPopup(false)
+            return true
+        }
         if (key == KeyEvent.KEYCODE_BUTTON_THUMBR && discCount > 1) {
             if (
                 event.action == KeyEvent.ACTION_DOWN &&
@@ -819,6 +849,7 @@ class CoreActivity : Activity() {
         if (closing || saveFailureShown || failureShown || button < 0) {
             return super.dispatchKeyEvent(event)
         }
+        if (popup && event.action == KeyEvent.ACTION_DOWN) return true
         if (event.action == KeyEvent.ACTION_DOWN || event.action == KeyEvent.ACTION_UP) {
             CoreHost.button(button, event.action == KeyEvent.ACTION_DOWN)
         }
@@ -826,7 +857,7 @@ class CoreActivity : Activity() {
     }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
-        if (playControls.isOpen) return true
+        if (holding) return true
         if (event.source and InputDevice.SOURCE_JOYSTICK != InputDevice.SOURCE_JOYSTICK) {
             return super.onGenericMotionEvent(event)
         }
