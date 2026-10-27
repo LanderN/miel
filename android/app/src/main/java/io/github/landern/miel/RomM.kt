@@ -69,6 +69,7 @@ class RomM(private val context: Context) {
         val year: Int,
         val genre: String,
         val titleId: String,
+        val boxart: String = "",
     )
 
     /** A sync session and the server's newest autosave of each game it covers, by game ID. */
@@ -192,6 +193,7 @@ class RomM(private val context: Context) {
                     else Instant.ofEpochMilli(released).atZone(ZoneOffset.UTC).year,
                     metadata.getJSONArray("genres").optString(0),
                     text(rom, "title_id"),
+                    asset(boxartPath(rom)),
                 ),
             )
         }
@@ -549,6 +551,18 @@ class RomM(private val context: Context) {
                 "devices.read",
                 "devices.write",
             )
+
+        /** Cached Box (2D, front) resource, with an unencoded version query for asset(). */
+        internal fun boxartPath(rom: JSONObject): String {
+            val path =
+                listOf("ss_metadata", "launchbox_metadata").firstNotNullOfOrNull { key ->
+                    rom.optJSONObject(key)
+                        ?.let { text(it, "box2d_path") }
+                        ?.takeIf { it.isNotEmpty() }
+                } ?: return ""
+            val updated = text(rom, "updated_at")
+            return "/assets/romm/resources/$path" + if (updated.isEmpty()) "" else "?v=$updated"
+        }
 
         /**
          * What to do with a game's save, from the content hashes of the local save, the server's

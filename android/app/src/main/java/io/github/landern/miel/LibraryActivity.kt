@@ -216,7 +216,7 @@ class LibraryActivity : ComponentActivity() {
             } ?: Hero("No apps", "", "")
         } else {
             session.game?.let { game ->
-                val boxart = artwork.coverPath(game.id)
+                val boxart = artwork.boxartPath(game)
                 val detail =
                     listOf(game.platform, if (game.year > 0) "${game.year}" else "", game.genre)
                         .filter { it.isNotEmpty() }

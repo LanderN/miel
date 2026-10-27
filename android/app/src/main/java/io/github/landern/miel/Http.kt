@@ -6,10 +6,10 @@ import java.io.InterruptedIOException
 import java.net.HttpURLConnection
 import java.net.URL
 
-internal fun fetchBytes(url: String, limit: Int): ByteArray {
+internal fun fetchBytes(url: String, limit: Int, timeoutMillis: Int = 6000): ByteArray {
     val connection = URL(url).openConnection() as HttpURLConnection
-    connection.connectTimeout = 6000
-    connection.readTimeout = 6000
+    connection.connectTimeout = timeoutMillis
+    connection.readTimeout = timeoutMillis
     connection.setRequestProperty("User-Agent", "miel/0.1")
     connection.instanceFollowRedirects = false
     try {

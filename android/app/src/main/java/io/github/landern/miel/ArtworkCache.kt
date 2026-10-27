@@ -20,7 +20,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Box covers and gameplay screenshots from local sidecars, Steam, RomM and Libretro's thumbnail server,
+ * Covers, front box art and screenshots from local sidecars, Steam, RomM and Libretro's thumbnail server,
  * kept in files/artwork/libretro-v1. Cached images are published before any request; downloads run
  * one at a time on a background thread, covers first.
  */
@@ -44,6 +44,10 @@ class ArtworkCache(
     fun coverPath(id: String): String = paths["${LibretroArt.BOXARTS}:$id"] ?: ""
 
     fun heroPath(id: String): String = paths["${LibretroArt.SNAPS}:$id"] ?: ""
+
+    fun boxartPath(game: Game): String =
+        paths["$FRONT_BOXART:${game.id}"]
+            ?: if (game.rommId == 0) coverPath(game.id) else ""
 
     fun close() {
         closed = true
@@ -138,6 +142,13 @@ class ArtworkCache(
 
     private fun current(request: Int) = !closed && request == generation.get()
 
+    private fun sourceFor(game: Game, kind: String): String =
+        when (kind) {
+            LibretroArt.BOXARTS -> game.cover
+            FRONT_BOXART -> game.boxart
+            else -> game.screenshot
+        }
+
     private fun publishCached(directory: File, games: List<Game>, request: Int) {
         for (game in games) {
             if (!current(request)) return
@@ -146,7 +157,8 @@ class ArtworkCache(
                 val file = image(directory, game.id, kind)
                 val recorded = File(directory, stem(game.id, kind) + ".source.txt")
                 val previous = if (recorded.isFile) recorded.readText() else ""
-                val source = if (kind == LibretroArt.BOXARTS) game.cover else game.screenshot
+                val source = sourceFor(game, kind)
+                if (kind == FRONT_BOXART && source.isEmpty()) continue
                 if (previous.startsWith("content:") && previous != source) continue
                 if (valid(file)) paths["$kind:${game.id}"] = file.absolutePath
             }
@@ -156,10 +168,10 @@ class ArtworkCache(
     private fun download(directory: File, games: List<Game>, request: Int, ticket: Int) {
         val listings = HashMap<String, List<String>>()
         val tried = HashSet<String>()
-        // Freeze the pending asset list: cached images and recent misses do not inflate progress.
+        // Freeze the pending asset list: cached images and recorded misses do not inflate progress.
         val pending = KINDS.flatMap { kind -> games.map { it to kind } }.filter { (game, kind) ->
             if (!current(request)) return
-            val source = if (kind == LibretroArt.BOXARTS) game.cover else game.screenshot
+            val source = sourceFor(game, kind)
             if (source.startsWith("content:")) {
                 fetchSource(directory, game, kind, source, request)
                 false
@@ -169,7 +181,7 @@ class ArtworkCache(
                 val recorded = File(directory, stem(game.id, kind) + ".source.txt")
                 !(paths.containsKey("$kind:${game.id}") && recorded.isFile && recorded.readText() == source)
             } else {
-                !paths.containsKey("$kind:${game.id}") && game.system.isNotEmpty()
+                kind != FRONT_BOXART && !paths.containsKey("$kind:${game.id}") && game.system.isNotEmpty()
             }
         }
         if (pending.isEmpty() || !current(request)) return
@@ -180,8 +192,12 @@ class ArtworkCache(
         var downloaded = 0
         pending.forEachIndexed { index, (game, kind) ->
             if (!current(request)) return
-            val supplied = if (kind == LibretroArt.BOXARTS) game.cover else game.screenshot
-            val asset = if (kind == LibretroArt.BOXARTS) "Cover art" else "Screenshot"
+            val supplied = sourceFor(game, kind)
+            val asset = when (kind) {
+                LibretroArt.BOXARTS -> "Cover art"
+                FRONT_BOXART -> "Front box art"
+                else -> "Screenshot"
+            }
             val provider = if (supplied.isEmpty()) "Libretro" else "Library source"
             show(MielNotification("Downloading: ${game.title}", "$asset · $provider",
                 "${index + 1} of ${pending.size}", index.toFloat() / pending.size))
@@ -234,7 +250,8 @@ class ArtworkCache(
 
     private companion object {
         const val TAG = "MielArtwork"
-        val KINDS = listOf(LibretroArt.BOXARTS, LibretroArt.SNAPS)
+        const val FRONT_BOXART = "Box2DFront"
+        val KINDS = listOf(LibretroArt.BOXARTS, FRONT_BOXART, LibretroArt.SNAPS)
         const val THREE_DS = "Nintendo - Nintendo 3DS"
 
         /**
@@ -247,6 +264,7 @@ class ArtworkCache(
         val REGIONS = listOf("Europe", "USA", "World", "Japan")
 
         const val DAY = 24L * 60 * 60 * 1000
+        const val LIBRETRO_TIMEOUT = 2000
         const val LISTING_LIMIT = 8 shl 20
         const val IMAGE_LIMIT = 4 shl 20
         const val MAX_IMAGE_SIZE = 2048
@@ -267,7 +285,15 @@ class ArtworkCache(
             kind: String,
             system: String,
             source: String,
-        ): File = cacheImage(directory, id, kind, system, source, fetchBytes(source, IMAGE_LIMIT))
+        ): File =
+            cacheImage(
+                directory,
+                id,
+                kind,
+                system,
+                source,
+                fetchBytes(source, IMAGE_LIMIT, LIBRETRO_TIMEOUT),
+            )
 
         private fun cacheImage(
             directory: File,
@@ -304,7 +330,11 @@ class ArtworkCache(
 
         fun stem(id: String, kind: String): String {
             if (!id.matches(Regex("[a-z0-9-]+"))) throw IOException("Invalid game ID")
-            return if (kind == LibretroArt.BOXARTS) id else "$id-snap-v1"
+            return when (kind) {
+                LibretroArt.BOXARTS -> id
+                FRONT_BOXART -> "$id-box2d-v1"
+                else -> "$id-snap-v1"
+            }
         }
 
         fun image(directory: File, id: String, kind: String) =
@@ -362,7 +392,10 @@ class ArtworkCache(
                 return LibretroArt.filenames(index.readText())
             }
             try {
-                val html = String(fetchBytes(LibretroArt.listingUrl(system, kind), LISTING_LIMIT))
+                val html =
+                    String(
+                        fetchBytes(LibretroArt.listingUrl(system, kind), LISTING_LIMIT, LIBRETRO_TIMEOUT),
+                    )
                 if (LibretroArt.filenames(html).isEmpty()) {
                     throw IOException("Empty thumbnail listing")
                 }
@@ -377,4 +410,3 @@ class ArtworkCache(
         }
     }
 }
-

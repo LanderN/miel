@@ -39,6 +39,8 @@ data class Game(
     /** RomM's 3DS title ID in hexadecimal, when it has one. */
     val titleId: String = "",
     val romDirectory: String = "",
+    /** RomM's cached Box (2D, front), separate from its cover. */
+    val boxart: String = "",
 ) {
     /** This game with `romm`'s ID, name and metadata. */
     fun linked(romm: Game) =
@@ -50,6 +52,7 @@ data class Game(
             year = romm.year,
             genre = romm.genre,
             titleId = romm.titleId,
+            boxart = romm.boxart,
         )
 
     /** The embedded core that runs the game, if any. */
@@ -478,6 +481,7 @@ class RomLibrary(
                 year = rom.year,
                 genre = rom.genre,
                 titleId = rom.titleId,
+                boxart = rom.boxart,
             )
 
         /** A game as rom-library.json stores it. */
@@ -498,6 +502,7 @@ class RomLibrary(
                 genre = json.optString("genre"),
                 titleId = json.optString("title_id"),
                 romDirectory = json.optString("rom_directory"),
+                boxart = json.optString("boxart"),
             )
         }
 
@@ -517,5 +522,6 @@ class RomLibrary(
                 .put("genre", game.genre)
                 .put("title_id", game.titleId)
                 .put("rom_directory", game.romDirectory)
+                .put("boxart", game.boxart)
     }
 }
