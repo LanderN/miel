@@ -295,22 +295,6 @@ class Session(private val path: File) {
         return core.settingOptions.associate { it.key to it.value(saved[it.key]) }
     }
 
-    val fastForward: Map<String, String>
-        get() {
-            val saved = disk.coreOptions[FAST_FORWARD].orEmpty()
-            return FAST_FORWARD_OPTIONS.associate { it.key to it.value(saved[it.key]) }
-        }
-
-    fun changeFastForward(index: Int, step: Int) {
-        val option = FAST_FORWARD_OPTIONS.getOrNull(index) ?: return
-        val values = option.values
-        val value =
-            values[
-                Math.floorMod(values.indexOf(fastForward.getValue(option.key)) + step, values.size)]
-        val options = fastForward + (option.key to value)
-        changeDisk { it.copy(coreOptions = it.coreOptions + (FAST_FORWARD to options)) }
-    }
-
     fun gameOverrides(): Map<String, String> {
         val id = game?.id ?: return emptyMap()
         return disk.settings[id]?.options().orEmpty() + disk.gameOptions[id].orEmpty()

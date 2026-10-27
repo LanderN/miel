@@ -46,24 +46,11 @@ internal fun settingsDetail(overlay: Overlay.Settings, session: Session): Settin
             raw,
         )
     }
-    FAST_FORWARD_OPTIONS.getOrNull(overlay.selected - FAST_FORWARD_START)?.let { option ->
-        return SettingsDetail(
-            "Fast-forward",
-            option.label,
-            option.label(session.fastForward.getValue(option.key)),
-            when (option.key) {
-                "button" -> "The controller button that fast-forwards."
-                "mode" -> "Fast-forward while the button is held, or switch it on and off."
-                "speed" -> "The fastest a game runs while fast-forwarding."
-                else -> "The game’s sound while fast-forwarding."
-            },
-        )
-    }
     val title = SETTINGS.getOrNull(overlay.selected).orEmpty()
     val emulator = Core.entries.getOrNull(overlay.selected - CORE_SETTINGS_START)
     val context =
         when {
-            overlay.selected < FAST_FORWARD_START -> "Library"
+            overlay.selected < CORE_SETTINGS_START -> "Library"
             emulator != null -> "Emulators"
             else -> "Device & storage"
         }

@@ -84,10 +84,16 @@ class CoreActivity : Activity() {
     private var discIndex = 0
     private var analogEnabled = true
     private var fastForward = false
-    private var fastForwardKey = KeyEvent.KEYCODE_UNKNOWN
-    private var fastForwardToggles = false
-    private var fastForwardSpeed = 3
-    private var fastForwardSound = true
+    private var fastForwardSettings = emptyMap<String, String>()
+    private val fastForwardKey
+        get() =
+            when (fastForwardSettings["button"]) {
+                "l2" -> KeyEvent.KEYCODE_BUTTON_L2
+                "r2" -> KeyEvent.KEYCODE_BUTTON_R2
+                "l3" -> KeyEvent.KEYCODE_BUTTON_THUMBL
+                "r3" -> KeyEvent.KEYCODE_BUTTON_THUMBR
+                else -> KeyEvent.KEYCODE_UNKNOWN
+            }
 
     /** Back shows PlayControls over a dual-screen game's lower screen, paused. */
     private var popup = false
@@ -129,23 +135,9 @@ class CoreActivity : Activity() {
                 .getBoolean(intent.getStringExtra(EXTRA_ROM_URI).orEmpty(), true)
         debugReports = debuggable && intent.getBooleanExtra(EXTRA_DEBUG_REPORTS, false)
         framePath = intent.getStringExtra(EXTRA_FRAME).orEmpty()
-        val fastForwardSettings =
-            intent.getStringArrayExtra(EXTRA_FAST_FORWARD).orEmpty().toList().chunked(2).associate {
-                it[0] to it[1]
-            }
-        fastForwardKey =
-            when (fastForwardSettings["button"]) {
-                "l2" -> KeyEvent.KEYCODE_BUTTON_L2
-                "r2" -> KeyEvent.KEYCODE_BUTTON_R2
-                "l3" -> KeyEvent.KEYCODE_BUTTON_THUMBL
-                "r3" -> KeyEvent.KEYCODE_BUTTON_THUMBR
-                else -> KeyEvent.KEYCODE_UNKNOWN
-            }
-        fastForwardToggles = fastForwardSettings["mode"] == "toggle"
-        fastForwardSpeed = fastForwardSettings["speed"]?.toIntOrNull() ?: 3
-        fastForwardSound = fastForwardSettings["sound"] != "off"
         if (!diagnostic && !probe) gameId = intent.getStringExtra(EXTRA_GAME_ID).orEmpty()
         played = PlayTime.played(this, gameId)
+        fastForwardSettings = FastForwardSettings.load(this, gameId)
 
         @Suppress("DEPRECATION")
         window.addFlags(
@@ -204,6 +196,12 @@ class CoreActivity : Activity() {
                 toggleFastForward = {
                     wakeLower()
                     setFastForward(!fastForward)
+                },
+                fastForwardSettings = fastForwardSettings,
+                changeFastForward = { key, value ->
+                    fastForwardSettings = fastForwardSettings + (key to value)
+                    FastForwardSettings.save(this, gameId, key, value)
+                    if (fastForward) setFastForward(true)
                 },
                 leave = ::returnToLibrary,
                 resume = { showPopup(false) },
@@ -666,7 +664,11 @@ class CoreActivity : Activity() {
 
     private fun setFastForward(on: Boolean) {
         fastForward = on
-        CoreHost.fastForward(on, fastForwardSpeed, fastForwardSound)
+        CoreHost.fastForward(
+            on,
+            fastForwardSettings["speed"]?.toIntOrNull() ?: 3,
+            fastForwardSettings["sound"] != "off",
+        )
     }
 
     private fun showPopup(show: Boolean) {
@@ -852,7 +854,7 @@ class CoreActivity : Activity() {
         if (key == fastForwardKey) {
             if (!closing && !saveFailureShown && event.repeatCount == 0) {
                 val down = event.action == KeyEvent.ACTION_DOWN
-                if (!fastForwardToggles) setFastForward(down)
+                if (fastForwardSettings["mode"] != "toggle") setFastForward(down)
                 else if (down) setFastForward(!fastForward)
             }
             return true
@@ -938,7 +940,7 @@ class CoreActivity : Activity() {
         const val EXTRA_ROM_DIRECTORY = "romDirectory"
         const val EXTRA_TITLE = "title"
 
-        /** The game's library ID, which keys its PlayTime. */
+        /** The game's library ID, which keys its PlayTime and FastForwardSettings. */
         const val EXTRA_GAME_ID = "gameId"
         const val EXTRA_ART = "art"
 
@@ -947,8 +949,6 @@ class CoreActivity : Activity() {
         const val EXTRA_FRESH = "fresh"
         const val EXTRA_OPTIONS = "coreOptions"
 
-        /** Session.fastForward as key and value pairs. */
-        const val EXTRA_FAST_FORWARD = "fastForward"
         const val EXTRA_RESOLUTION = "resolution"
         const val EXTRA_HARDWARE_SHADERS = "hardwareShaders"
 

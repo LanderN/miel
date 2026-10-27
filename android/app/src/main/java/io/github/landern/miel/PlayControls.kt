@@ -26,7 +26,8 @@ import kotlin.math.roundToInt
 
 /**
  * The lower screen during single-screen play: the game's art, title and play time, the time and
- * battery, and fast-forward, Library, PlayStation controller and disc controls.
+ * battery, and fast-forward, Library, PlayStation controller and disc controls. The disc chooser
+ * and fast-forward settings open as a sheet over it.
  */
 class PlayControls(
     context: Context,
@@ -36,6 +37,8 @@ class PlayControls(
     private val insert: (Int) -> Unit,
     private val toggleAnalog: () -> Unit,
     private val toggleFastForward: () -> Unit,
+    fastForwardSettings: Map<String, String>,
+    private val changeFastForward: (key: String, value: String) -> Unit,
     private val leave: () -> Unit,
     resume: () -> Unit,
 ) : FrameLayout(context) {
@@ -66,10 +69,17 @@ class PlayControls(
     private val analogRow = LinearLayout(context)
     private val analogDivider = View(context)
     private val fastForwardRow = LinearLayout(context)
+    private var settings = fastForwardSettings
+    private val settingsSummary = label("", 14f)
+    private val settingValues = ArrayList<TextView>()
+    private var choosingDisc = true
+    private val panelTitle = label("", 28f, true)
+    private val discFooter = LinearLayout(context)
+    private val settingsFooter = LinearLayout(context)
     private val panel = LinearLayout(context)
     private val rows = LinearLayout(context)
     private val scroll = ScrollView(context)
-    private val choices = ArrayList<TextView>()
+    private val choices = ArrayList<View>()
     private var count = 0
     private var index = 0
     private var selected = 0
@@ -155,6 +165,18 @@ class PlayControls(
         switchRow(analogRow, "Analog controls", analog)
         addDivider(analogDivider)
         switchRow(fastForwardRow, "Fast-forward", fastForward)
+        addDivider(View(context))
+        val settingsRow = LinearLayout(context)
+        settingsRow.gravity = Gravity.CENTER_VERTICAL
+        settingsRow.minimumHeight = dp(48)
+        settingsRow.setOnClickListener { openSettings() }
+        settingsRow.addView(
+            label("Fast-forward settings", 16f, true),
+            LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f),
+        )
+        settingsRow.addView(settingsSummary)
+        dock.addView(settingsRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        summarize()
         column.addView(dock, LinearLayout.LayoutParams(dp(340), WRAP_CONTENT))
         addView(
             column,
@@ -167,19 +189,23 @@ class PlayControls(
         panel.setBackgroundColor(cream)
         panel.visibility = GONE
         panel.isClickable = true
-        panel.addView(label("Change disc", 28f, true))
+        panel.addView(panelTitle)
         rows.orientation = LinearLayout.VERTICAL
         scroll.isFillViewport = false
         scroll.clipToPadding = false
         scroll.setPadding(0, dp(16), 0, dp(16))
         scroll.addView(rows)
         panel.addView(scroll, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
-        val footer = LinearLayout(context)
-        footer.gravity = Gravity.CENTER_VERTICAL
-        footer.addView(action("B", "Cancel", false) { close() })
-        footer.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
-        footer.addView(action("A", "Insert disc", true) { confirm() })
-        panel.addView(footer)
+        discFooter.gravity = Gravity.CENTER_VERTICAL
+        discFooter.addView(action("B", "Cancel", false) { close() })
+        discFooter.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+        discFooter.addView(action("A", "Insert disc", true) { confirm() })
+        panel.addView(discFooter)
+        settingsFooter.gravity = Gravity.CENTER_VERTICAL
+        settingsFooter.addView(action("B", "Done", false) { close() })
+        settingsFooter.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+        settingsFooter.addView(action("A", "Change", true) { confirm() })
+        panel.addView(settingsFooter)
         addView(panel, LayoutParams(MATCH_PARENT, MATCH_PARENT))
     }
 
@@ -226,35 +252,87 @@ class PlayControls(
         }
     }
 
+    /** Opens the disc chooser. */
     fun open() {
         if (count < 2 || isOpen) return
+        sheet(true, "Change disc")
+        selected = index.coerceIn(0, count - 1)
+        repeat(count) { disc ->
+            choice(
+                label("Disc ${disc + 1}" + if (disc == index) "   ·   Inserted" else "", 18f, true),
+            ) {
+                selected = disc
+                confirm()
+            }
+        }
+        highlight()
+    }
+
+    private fun openSettings() {
+        if (isOpen) return
+        sheet(false, "Fast-forward")
+        selected = 0
+        FAST_FORWARD_OPTIONS.forEachIndexed { option, it ->
+            val value = label("", 18f)
+            settingValues.add(value)
+            val row = LinearLayout(context)
+            row.gravity = Gravity.CENTER_VERTICAL
+            row.addView(label(it.label, 18f, true), LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+            row.addView(value)
+            choice(row) {
+                selected = option
+                confirm()
+            }
+        }
+        summarize()
+        highlight()
+    }
+
+    private fun sheet(discs: Boolean, title: String) {
         opened()
         isOpen = true
-        selected = index.coerceIn(0, count - 1)
+        choosingDisc = discs
+        panelTitle.text = title
+        discFooter.visibility = if (discs) VISIBLE else GONE
+        settingsFooter.visibility = if (discs) GONE else VISIBLE
         dock.visibility = GONE
         panel.visibility = VISIBLE
         rows.removeAllViews()
         choices.clear()
-        repeat(count) { disc ->
-            val row =
-                label("Disc ${disc + 1}" + if (disc == index) "   ·   Inserted" else "", 18f, true)
-            row.gravity = Gravity.CENTER_VERTICAL
-            row.setPadding(dp(20), dp(16), dp(20), dp(16))
-            row.isClickable = true
-            relief(row)
-            row.setOnClickListener {
-                selected = disc
-                confirm()
-            }
-            rows.addView(
-                row,
-                LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply {
-                    bottomMargin = dp(8)
-                },
-            )
-            choices.add(row)
+        settingValues.clear()
+    }
+
+    private fun choice(row: View, clicked: () -> Unit) {
+        row.setPadding(dp(20), dp(16), dp(20), dp(16))
+        row.isClickable = true
+        relief(row)
+        row.setOnClickListener { clicked() }
+        rows.addView(
+            row,
+            LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dp(8) },
+        )
+        choices.add(row)
+    }
+
+    /** Moves the selected fast-forward setting `step` values along. */
+    private fun cycle(step: Int) {
+        val option = FAST_FORWARD_OPTIONS[selected]
+        val values = option.values
+        val value =
+            values[Math.floorMod(values.indexOf(settings.getValue(option.key)) + step, values.size)]
+        settings = settings + (option.key to value)
+        changeFastForward(option.key, value)
+        summarize()
+    }
+
+    private fun summarize() {
+        FAST_FORWARD_OPTIONS.forEachIndexed { option, it ->
+            settingValues.getOrNull(option)?.text = it.label(settings.getValue(it.key))
         }
-        highlight()
+        val speed = FAST_FORWARD_OPTIONS[2].label(settings.getValue("speed"))
+        settingsSummary.text =
+            if (settings["button"] == "off") speed
+            else "${FAST_FORWARD_OPTIONS[0].label(settings.getValue("button"))} · $speed"
     }
 
     fun close() {
@@ -270,13 +348,15 @@ class PlayControls(
         if (event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP -> {
-                    selected = (selected - 1 + count) % count
+                    selected = (selected - 1 + choices.size) % choices.size
                     highlight()
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    selected = (selected + 1) % count
+                    selected = (selected + 1) % choices.size
                     highlight()
                 }
+                KeyEvent.KEYCODE_DPAD_LEFT -> if (!choosingDisc) cycle(-1)
+                KeyEvent.KEYCODE_DPAD_RIGHT -> if (!choosingDisc) cycle(1)
                 KeyEvent.KEYCODE_BUTTON_A,
                 KeyEvent.KEYCODE_DPAD_CENTER,
                 KeyEvent.KEYCODE_ENTER -> if (event.repeatCount == 0) confirm()
@@ -290,19 +370,20 @@ class PlayControls(
     }
 
     private fun confirm() {
+        if (!choosingDisc) return cycle(1)
         insert(selected)
         close()
     }
 
     private fun highlight() {
-        choices.forEachIndexed { disc, view ->
+        choices.forEachIndexed { choice, view ->
             view.background =
                 background(
-                    if (disc == selected) 0xfff3dfb3.toInt() else surface,
+                    if (choice == selected) 0xfff3dfb3.toInt() else surface,
                     18,
-                    if (disc == selected) ring else line,
+                    if (choice == selected) ring else line,
                 )
-            view.isSelected = disc == selected
+            view.isSelected = choice == selected
         }
         choices.getOrNull(selected)?.let { row ->
             scroll.post { scroll.smoothScrollTo(0, row.top) }

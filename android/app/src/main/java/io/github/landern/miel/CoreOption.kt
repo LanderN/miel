@@ -392,7 +392,7 @@ fun CoreSettings.options(): Map<String, String> =
 fun Core.settingIndices(perGame: Boolean): IntRange =
     0 until settingOptions.size + if (this == Core.AZAHAR && !perGame) 1 else 0
 
-/** Fast-forward settings, kept with the core defaults under FAST_FORWARD. */
+/** Fast-forward settings; see FastForwardSettings. */
 val FAST_FORWARD_OPTIONS =
     listOf(
         CoreOption(
@@ -411,5 +411,3 @@ val FAST_FORWARD_OPTIONS =
         ),
         CoreOption("sound", "Sound", listOf("on", "off"), listOf("On", "Off")),
     )
-
-const val FAST_FORWARD = "FAST_FORWARD"
