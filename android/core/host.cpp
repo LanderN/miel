@@ -107,6 +107,7 @@ std::atomic<bool> fastForward{false}, fastForwardSound{true};
 std::atomic<int> fastForwardSpeed{3};
 // Frames run per frame period, measured over recent frames.
 std::atomic<double> speed{1};
+double audioRate = 32768;
 
 // The session's state, reported to Java.
 std::atomic<bool> ready{false}, restored{false}, restoredBackup{false}, restoreBlocked{false},
@@ -422,40 +423,95 @@ void push(const int16_t* data, size_t count) {
     audioWrite.store(write + samples, std::memory_order_release);
 }
 
-// During fast-forward, consecutive frames are averaged into one at the measured speed, raising the
-// pitch. The ratio leans on the queue's fill so output neither runs dry nor overflows.
+// Time-stretches fast-forward audio to real-time length at its original pitch (WSOLA). Each output
+// grain starts where the input best matches the previous grain's end and crossfades into it.
+class Stretch {
+public:
+    void reset(double rate) {
+        grain = size_t(rate * .04);
+        overlap = size_t(rate * .01);
+        seek = size_t(rate * .015);
+        input.clear();
+        tail.assign(overlap * 2, 0);
+        carry = 0;
+        skip = 0;
+        primed = false;
+    }
+
+    // Consumes `step` input frames per output frame; queues output through push.
+    void add(const int16_t* data, size_t count, double step) {
+        input.insert(input.end(), data, data + count * 2);
+        while (true) {
+            size_t dropped = std::min(skip, input.size() / 2);
+            input.erase(input.begin(), input.begin() + dropped * 2);
+            skip -= dropped;
+            if (skip > 0 || input.size() / 2 < seek + grain) break;
+            size_t best = primed ? match() : 0;
+            output.clear();
+            for (size_t i = 0; i < overlap * 2; i++) {
+                float weight = float(i / 2) / overlap;
+                output.push_back(int16_t(tail[i] * (1 - weight) + input[best * 2 + i] * weight));
+            }
+            auto body = input.begin() + (best + overlap) * 2;
+            output.insert(output.end(), body, body + (grain - 2 * overlap) * 2);
+            auto end = input.begin() + (best + grain - overlap) * 2;
+            tail.assign(end, end + overlap * 2);
+            primed = true;
+            push(output.data(), output.size() / 2);
+            double advance = step * (grain - overlap) + carry;
+            skip = size_t(advance);
+            carry = advance - skip;
+        }
+    }
+
+private:
+    // The offset within the seek window whose start correlates best with `tail`.
+    size_t match() const {
+        size_t best = 0;
+        float bestScore = -INFINITY;
+        for (size_t offset = 0; offset < seek; offset++) {
+            float dot = 0, energy = 1;
+            for (size_t i = 0; i < overlap; i += 2) {
+                float a = float(tail[i * 2]) + tail[i * 2 + 1];
+                float b = float(input[(offset + i) * 2]) + input[(offset + i) * 2 + 1];
+                dot += a * b;
+                energy += b * b;
+            }
+            float score = dot / std::sqrt(energy);
+            if (score > bestScore) {
+                bestScore = score;
+                best = offset;
+            }
+        }
+        return best;
+    }
+
+    // Input frames still to discard before the next grain.
+    size_t grain = 0, overlap = 0, seek = 0, skip = 0;
+    std::vector<int16_t> input, tail, output;
+    double carry = 0;
+    bool primed = false;
+};
+
+Stretch stretch;
+std::atomic<bool> stretching{false};
+
+// During fast-forward the measured speed sets the stretch, leaning on the queue's fill so output
+// neither runs dry nor overflows.
 size_t audio(const int16_t* data, size_t count) {
     audioFrames += count;
     if (!fastForward) {
+        stretching = false;
         push(data, count);
         return count;
     }
     if (!fastForwardSound) return count;
+    if (!stretching.exchange(true)) stretch.reset(audioRate);
     size_t queued =
         (audioWrite.load(std::memory_order_relaxed) - audioRead.load(std::memory_order_acquire)) /
         2;
     double fill = double(queued) / std::max<size_t>(audioPrefill, 1);
-    double step = std::max(1., speed.load()) * std::clamp(.75 + .25 * fill, .8, 1.25);
-    static int32_t sum[2];
-    static int summed = 0;
-    static double phase = 0;
-    int16_t out[512];
-    size_t frames = 0;
-    for (size_t i = 0; i < count; i++) {
-        sum[0] += data[i * 2];
-        sum[1] += data[i * 2 + 1];
-        summed++;
-        if (++phase < step) continue;
-        phase -= step;
-        out[frames * 2] = int16_t(sum[0] / summed);
-        out[frames * 2 + 1] = int16_t(sum[1] / summed);
-        sum[0] = sum[1] = summed = 0;
-        if (++frames == 256) {
-            push(out, frames);
-            frames = 0;
-        }
-    }
-    push(out, frames);
+    stretch.add(data, count, std::max(1., speed.load()) * std::clamp(.75 + .25 * fill, .8, 1.25));
     return count;
 }
 
@@ -488,6 +544,7 @@ aaudio_data_callback_result_t outputAudio(AAudioStream*, void*, void* output, in
 }
 
 void setupAudio(double rate) {
+    audioRate = rate;
     audioPrefill = size_t(rate * kAudioPrefillSeconds) * 2;
     AAudioStreamBuilder* builder = nullptr;
     AAudio_createStreamBuilder(&builder);

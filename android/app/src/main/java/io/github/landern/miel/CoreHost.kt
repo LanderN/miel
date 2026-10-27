@@ -67,8 +67,8 @@ object CoreHost {
     @JvmStatic external fun changeDisc(index: Int)
 
     /**
-     * Runs the game at up to `speed` times its rate; with `sound`, its audio plays faster and
-     * higher.
+     * Runs the game at up to `speed` times its rate; with `sound`, its audio plays faster at its
+     * original pitch.
      */
     @JvmStatic external fun fastForward(on: Boolean, speed: Int, sound: Boolean)
 
