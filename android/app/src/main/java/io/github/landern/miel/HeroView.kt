@@ -8,6 +8,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.text.Layout
@@ -29,17 +30,20 @@ data class Hero(
     /** Draws `art` centred instead of covering the screen. */
     val icon: Boolean = false,
     val settings: SettingsDetail? = null,
+    /** Fills the screen with front box art, without a text overlay. */
+    val boxart: Boolean = false,
 )
 
 /**
- * The lower screen: artwork with a title and a detail line, drawn with Canvas. A new selection
- * crossfades in once its art is decoded off the UI thread.
+ * The lower screen: box art, screenshot details or setting context, drawn with Canvas. A new
+ * selection crossfades in once its art is decoded off the UI thread.
  */
 class HeroView(context: Context) : View(context) {
     private val paint = TextPaint(Paint.ANTI_ALIAS_FLAG)
     private val artPaint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val shade = Paint()
     private val bounds = RectF()
+    private val textBounds = Rect()
     private val titleFace = context.resources.getFont(R.font.nunito_extrabold)
     private val detailFace = context.resources.getFont(R.font.nunito_regular)
     private val cache = LruCache<String, Bitmap>(4)
@@ -130,7 +134,7 @@ class HeroView(context: Context) : View(context) {
         // The library's 24dp gutter, scaled down on small displays.
         val scale = minOf(resources.displayMetrics.density, width / 480f, height / 270f)
         canvas.drawColor(BACKGROUND)
-        if (from.settings == null && to.settings == null) {
+        if (from.settings == null && to.settings == null && !from.boxart && !to.boxart) {
             val fromAlpha = if (toArt != null && !to.icon) 1f else 1 - progress
             drawArt(canvas, from, fromArt, fromAlpha, scale, width, height)
             drawArt(canvas, to, toArt, progress, scale, width, height)
@@ -158,6 +162,9 @@ class HeroView(context: Context) : View(context) {
         if (settings != null) {
             canvas.drawColor(0xfff5efe4.toInt())
             drawSettings(canvas, settings, scale, width, height)
+        } else if (hero.boxart) {
+            canvas.drawColor(0xfff5efe4.toInt())
+            drawArt(canvas, hero, art, 1f, scale, width, height)
         } else {
             canvas.drawColor(BACKGROUND)
             drawArt(canvas, hero, art, 1f, scale, width, height)
@@ -217,11 +224,8 @@ class HeroView(context: Context) : View(context) {
     ) {
         if (art == null || alpha <= 0) return
         val fit =
-            if (hero.icon) {
-                128 * scale / maxOf(art.width, art.height)
-            } else {
-                maxOf(width / art.width, height / art.height)
-            }
+            if (hero.icon) 128 * scale / maxOf(art.width, art.height)
+            else maxOf(width / art.width, height / art.height)
         val artWidth = art.width * fit
         val artHeight = art.height * fit
         bounds.set(
@@ -245,6 +249,17 @@ class HeroView(context: Context) : View(context) {
         if (alpha <= 0) return
         val x = 24 * scale
         val opacity = (255 * alpha).toInt()
+        val detailY = height - 24 * scale
+        paint.typeface = detailFace
+        paint.color = 0xffe5d6bc.toInt()
+        paint.alpha = opacity
+        paint.textSize = 14 * scale
+        val detail =
+            TextUtils.ellipsize(hero.detail, paint, width - 2 * x, TextUtils.TruncateAt.END)
+                .toString()
+        canvas.drawText(detail, x, detailY, paint)
+        paint.getTextBounds(detail, 0, detail.length, textBounds)
+        val titleBottom = detailY + textBounds.top - 8 * scale
         paint.typeface = titleFace
         paint.color = 0xfffdfaf3.toInt()
         paint.alpha = opacity
@@ -262,17 +277,14 @@ class HeroView(context: Context) : View(context) {
                 .setMaxLines(2)
                 .setEllipsize(TextUtils.TruncateAt.END)
                 .build()
+        val lastLine = title.lineCount - 1
+        val lastText =
+            hero.title.substring(title.getLineStart(lastLine), title.getLineEnd(lastLine))
+        paint.getTextBounds(lastText, 0, lastText.length, textBounds)
         canvas.save()
-        canvas.translate(x, height - 60 * scale - title.height)
+        canvas.translate(x, titleBottom - title.getLineBaseline(lastLine) - textBounds.bottom)
         title.draw(canvas)
         canvas.restore()
-        paint.typeface = detailFace
-        paint.color = 0xffe5d6bc.toInt()
-        paint.alpha = opacity
-        paint.textSize = 14 * scale
-        val detail =
-            TextUtils.ellipsize(hero.detail, paint, width - 2 * x, TextUtils.TruncateAt.END)
-        canvas.drawText(detail.toString(), x, height - 24 * scale, paint)
     }
 
     companion object {

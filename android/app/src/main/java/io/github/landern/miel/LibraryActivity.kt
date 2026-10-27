@@ -216,17 +216,16 @@ class LibraryActivity : ComponentActivity() {
             } ?: Hero("No apps", "", "")
         } else {
             session.game?.let { game ->
+                val boxart = artwork.coverPath(game.id)
                 val detail =
                     listOf(game.platform, if (game.year > 0) "${game.year}" else "", game.genre)
                         .filter { it.isNotEmpty() }
                         .joinToString(" · ")
-                val hero = artwork.heroPath(game.id)
-                val icon = hero.isEmpty() && DroidDeck.isGame(game)
                 Hero(
                     game.title,
                     detail,
-                    if (icon) artwork.coverPath(game.id) else hero,
-                    icon = icon,
+                    boxart.ifEmpty { artwork.heroPath(game.id) },
+                    boxart = boxart.isNotEmpty(),
                 )
             } ?: Hero(if (session.games.isEmpty()) "No games" else "No recent games", "", "")
         }

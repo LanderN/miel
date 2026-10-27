@@ -1,14 +1,12 @@
 package io.github.landern.miel
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.innerShadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.unit.DpOffset
@@ -37,41 +35,21 @@ internal fun Modifier.softShadow(shape: Shape, height: Float = 1f): Modifier =
             ),
         )
 
-/** Smooth, same-colour relief with muted rims; inset surfaces collect shadow at the upper edge. */
+/** Smooth relief without outlines; inset surfaces collect shadow at the upper edge. */
 internal fun Modifier.relief(
     shape: Shape,
     face: Color,
     height: Float = 1f,
     inset: Boolean = false,
-    outline: Color? = null,
 ): Modifier {
     val base = if (inset) this else softShadow(shape, height)
     val surface =
-        base
-            .background(
-                Brush.linearGradient(
-                    listOf(lerp(face, Color.White, .025f), lerp(face, Color(0xFF6B5035), .015f)),
-                ),
-                shape,
-            )
-            .border(
-                1.dp,
-                if (outline != null) SolidColor(outline)
-                else
-                    Brush.linearGradient(
-                        if (inset)
-                            listOf(
-                                lerp(face, Color(0xFF6B5035), .14f),
-                                lerp(face, Color.White, .12f),
-                            )
-                        else
-                            listOf(
-                                lerp(face, Color.White, .08f),
-                                lerp(face, Color(0xFF6B5035), .1f),
-                            ),
-                    ),
-                shape,
-            )
+        base.background(
+            Brush.linearGradient(
+                listOf(lerp(face, Color.White, .025f), lerp(face, Color(0xFF6B5035), .015f)),
+            ),
+            shape,
+        )
     return if (inset)
         surface
             .innerShadow(

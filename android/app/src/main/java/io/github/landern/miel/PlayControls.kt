@@ -237,7 +237,6 @@ class PlayControls(
                 background(
                     if (primary) honey else surface,
                     26,
-                    if (primary) 0xffa16d1c.toInt() else 0xffad9676.toInt(),
                 )
             isClickable = true
             isFocusable = true

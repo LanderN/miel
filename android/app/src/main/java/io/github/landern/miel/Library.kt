@@ -49,6 +49,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -282,11 +283,10 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
 private fun Header(session: Session, command: (Command) -> Unit) {
     Row(
         Modifier.fillMaxWidth().height(Miel.control),
-        horizontalArrangement = Arrangement.spacedBy(Miel.spaceXs),
+        horizontalArrangement = Arrangement.spacedBy(Miel.gap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val tabs = session.tabs
-        KeyHint("L") { command(Command.PreviousTab) }
         Segmented(
             tabs.map { it.label },
             tabs.indexOf(session.tab),
@@ -297,7 +297,6 @@ private fun Header(session: Session, command: (Command) -> Unit) {
         ) {
             command(Command.ChooseTab(tabs[it]))
         }
-        KeyHint("R") { command(Command.NextTab) }
         Pressable(Modifier.size(Miel.control), { command(Command.Select) }) { pressed ->
             Box(
                 Modifier.fillMaxSize().controlSurface(CircleShape, Miel.surface, pressed),
@@ -343,13 +342,12 @@ private fun ColumnScope.Empty(session: Session) {
 }
 
 /** A tile's place on the visible page. */
-private class Cell(val index: Int, val slot: Int)
+private class Cell(val index: Int, val slot: Int, val id: String)
 
 /**
- * A scrolling grid that fills `rows` per column, with one outline following the selection's `slot`.
- * A single row is centred vertically; multiple rows rest on the divider below. The next column
- * peeks past the right gutter. `aspect` is the width over height every tile shares, or null to fill
- * the rows.
+ * A scrolling grid that fills `rows` per column, with the selection at `slot`. A single row is
+ * centred vertically; multiple rows rest on the divider below. The next column peeks past the right
+ * gutter. `aspect` is the width over height every tile shares, or null to fill the rows.
  */
 @Composable
 private fun ColumnScope.TileGrid(
@@ -417,27 +415,29 @@ private fun ColumnScope.TileGrid(
                 left + tileWidth >= scroll && left <= scroll + viewport
             }
             for (cell in visible) {
-                if (above != null) {
-                    Box(
-                        Modifier.offset(x(cell.slot) - scrollDp, y(cell.slot) - aboveHeight)
-                            .size(cellWidth, aboveHeight),
-                    ) {
-                        above(cell.index)
+                key(cell.id) {
+                    if (above != null) {
+                        Box(
+                            Modifier.offset(x(cell.slot) - scrollDp, y(cell.slot) - aboveHeight)
+                                .size(cellWidth, aboveHeight),
+                        ) {
+                            above(cell.index)
+                        }
                     }
-                }
-                Box(
-                    Modifier.offset(x(cell.slot) - scrollDp, y(cell.slot))
-                        .zIndex(if (cell.slot == slot) 1f else 0f)
-                        .size(cellWidth, cellHeight),
-                ) {
-                    tile(cell.index, cell.slot == slot, cellHeight)
-                }
-                if (below != null) {
                     Box(
-                        Modifier.offset(x(cell.slot) - scrollDp, y(cell.slot) + cellHeight)
-                            .size(cellWidth, belowHeight),
+                        Modifier.offset(x(cell.slot) - scrollDp, y(cell.slot))
+                            .zIndex(if (cell.slot == slot) 1f else 0f)
+                            .size(cellWidth, cellHeight),
                     ) {
-                        below(cell.index)
+                        tile(cell.index, cell.slot == slot, cellHeight)
+                    }
+                    if (below != null) {
+                        Box(
+                            Modifier.offset(x(cell.slot) - scrollDp, y(cell.slot) + cellHeight)
+                                .size(cellWidth, belowHeight),
+                        ) {
+                            below(cell.index)
+                        }
                     }
                 }
             }
@@ -451,7 +451,7 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
     val page = session.order
     val slot = session.position
     TileGrid(
-        page.mapIndexed { slot, index -> Cell(index, slot) },
+        page.mapIndexed { slot, index -> Cell(index, slot, session.games[index].id) },
         slot,
         session.gameRows,
         columns,
@@ -564,7 +564,7 @@ private fun ColumnScope.AppGrid(session: Session, art: Art, command: (Command) -
     val slot = session.appSelected
     val page = session.apps.indices
     TileGrid(
-        page.map { Cell(it, it - page.first) },
+        page.map { Cell(it, it - page.first, session.apps[it].id) },
         slot,
         APP_ROWS,
         APP_COLUMNS,
@@ -683,7 +683,6 @@ private fun Modifier.controlSurface(
     shape: Shape,
     face: Color,
     pressed: Boolean,
-    outline: Color? = null,
 ): Modifier {
     val depth by
         animateFloatAsState(
@@ -691,10 +690,10 @@ private fun Modifier.controlSurface(
             tween(if (pressed) 90 else 160, easing = Miel.easeOut),
         )
     return graphicsLayer { translationY = ((1f - depth) * 1.5f).dp.toPx() }
-        .relief(shape, face, height = depth, outline = outline)
+        .relief(shape, face, height = depth)
 }
 
-/** A raised cream or honey action with an inset controller badge. */
+/** A raised cream or honey action with a printed controller badge. */
 @Composable
 private fun RowScope.Pill(
     key: String,
@@ -726,12 +725,6 @@ private fun RowScope.Pill(
                     shape,
                     face,
                     pressed,
-                    outline =
-                        when {
-                            destructive -> Color(0xFFBE8694)
-                            primary -> Color(0xFFA16D1C)
-                            else -> Color(0xFFAD9676)
-                        },
                 )
                 .padding(horizontal = Miel.gap),
             horizontalArrangement =
@@ -745,20 +738,6 @@ private fun RowScope.Pill(
                 size = Miel.textBody,
                 weight = FontWeight.Bold,
                 lines = 1,
-            )
-        }
-    }
-}
-
-/** A controller button hint that also acts on touch. */
-@Composable
-private fun KeyHint(key: String, onClick: () -> Unit) {
-    Pressable(Modifier.size(Miel.control), onClick) { pressed ->
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            ControllerBadge(
-                key,
-                Modifier.size(32.dp, 24.dp),
-                if (pressed) Miel.pressed else Miel.surface,
             )
         }
     }
@@ -973,7 +952,6 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
                                         if (chosen) Miel.selection else Miel.surface,
                                         height = .5f,
                                         inset = chosen || pressed,
-                                        outline = if (chosen) Miel.ring else null,
                                     )
                                     .padding(Miel.inset),
                                 contentAlignment = Alignment.CenterStart,
@@ -1092,7 +1070,6 @@ private fun SettingsOption(
                             shape,
                             face,
                             inset = true,
-                            outline = if (chosen) Miel.ring else null,
                         )
                     else Modifier,
                 )
