@@ -105,7 +105,7 @@ std::atomic<bool> analogEnabled{true};
 std::atomic<unsigned> discCount{0}, discIndex{0};
 std::atomic<bool> discFailed{false};
 std::atomic<bool> fastForward{false}, fastForwardSound{true};
-std::atomic<int> fastForwardSpeed{3};
+std::atomic<double> fastForwardSpeed{3};
 // Frames run per frame period: the period over the recent average frame time.
 std::atomic<double> speed{1};
 double audioRate = 32768;
@@ -1245,7 +1245,9 @@ void loop(const Launch& launch, double fps) {
             checkpointDue = Clock::now() + interval;
         }
         // Pace without vsync; after a stall of over 100 ms, start counting again from now.
-        next += fastForward ? period / fastForwardSpeed.load() : period;
+        next += fastForward
+                    ? std::chrono::duration_cast<Clock::duration>(period / fastForwardSpeed.load())
+                    : period;
         if (next > Clock::now()) {
             uint64_t sleepStart = micros();
             std::this_thread::sleep_until(next);
@@ -1507,9 +1509,9 @@ extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_analog(JN
 
 extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_fastForward(JNIEnv*, jclass,
                                                                                    jboolean on,
-                                                                                   jint maximum,
+                                                                                   jfloat maximum,
                                                                                    jboolean sound) {
-    fastForwardSpeed = std::clamp(int(maximum), 2, 8);
+    fastForwardSpeed = std::clamp(double(maximum), 1.5, 8.);
     fastForwardSound = sound;
     fastForward = on;
 }

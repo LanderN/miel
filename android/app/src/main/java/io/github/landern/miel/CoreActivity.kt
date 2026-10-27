@@ -1,6 +1,5 @@
 package io.github.landern.miel
 
-import android.app.Activity
 import android.app.AlertDialog
 import android.app.Presentation
 import android.content.Intent
@@ -31,6 +30,9 @@ import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -44,7 +46,7 @@ import org.json.JSONObject
  * separate bottom-screen volume to the game's audio. Home, Back and pause checkpoint the game;
  * leaving reopens the library through LaunchActivity.
  */
-class CoreActivity : Activity() {
+class CoreActivity : ComponentActivity() {
     private val main = Handler(Looper.getMainLooper())
     private lateinit var rumble: CoreRumble
     private val staging = Executors.newSingleThreadExecutor()
@@ -157,6 +159,8 @@ class CoreActivity : Activity() {
                 }
             }
         lowerRoot.setBackgroundColor(Color.BLACK)
+        lowerRoot.setViewTreeLifecycleOwner(this)
+        lowerRoot.setViewTreeSavedStateRegistryOwner(this)
         lowerRoot.addView(screen(0), FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         status = TextView(this)
         status.setTextColor(Color.WHITE)
@@ -666,7 +670,7 @@ class CoreActivity : Activity() {
         fastForward = on
         CoreHost.fastForward(
             on,
-            fastForwardSettings["speed"]?.toIntOrNull() ?: 3,
+            fastForwardSettings["speed"]?.toFloatOrNull() ?: 3f,
             fastForwardSettings["sound"] != "off",
         )
     }

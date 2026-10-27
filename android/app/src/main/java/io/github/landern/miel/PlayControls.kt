@@ -1,28 +1,61 @@
 package io.github.landern.miel
 
-import android.animation.ObjectAnimator
-import android.animation.StateListAnimator
 import android.content.Context
-import android.content.res.ColorStateList
 import android.graphics.Bitmap
-import android.graphics.drawable.GradientDrawable
 import android.os.BatteryManager
 import android.os.SystemClock
-import android.text.TextUtils
-import android.view.Gravity
+import android.text.format.DateFormat
 import android.view.KeyEvent
-import android.view.View
-import android.view.ViewGroup.LayoutParams.MATCH_PARENT
-import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-import android.view.animation.DecelerateInterpolator
-import android.widget.FrameLayout
-import android.widget.ImageView
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.Switch
-import android.widget.TextClock
-import android.widget.TextView
-import kotlin.math.roundToInt
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.AbstractComposeView
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.delay
 
 /**
  * The lower screen during single-screen play: the game's art, title and play time, the time and
@@ -31,7 +64,7 @@ import kotlin.math.roundToInt
  */
 class PlayControls(
     context: Context,
-    title: String?,
+    private val title: String?,
     private val opened: () -> Unit,
     private val dismissed: () -> Unit,
     private val insert: (Int) -> Unit,
@@ -40,176 +73,44 @@ class PlayControls(
     fastForwardSettings: Map<String, String>,
     private val changeFastForward: (key: String, value: String) -> Unit,
     private val leave: () -> Unit,
-    resume: () -> Unit,
-) : FrameLayout(context) {
-    private val cream = 0xfff5efe4.toInt()
-    private val surface = 0xfffffaf1.toInt()
-    private val ink = 0xff4b3928.toInt()
-    private val muted = 0xff6c5b46.toInt()
-    private val honey = 0xffefb13a.toInt()
-    private val ring = 0xffa8731c.toInt()
-    private val line = 0xffded2bd.toInt()
-    private val paper = 0xfffbf7ef.toInt()
-    private val paperMuted = 0xccfbf7ef.toInt()
-    private val regular = resources.getFont(R.font.nunito_regular)
-    private val bold = resources.getFont(R.font.nunito_bold)
-    private val dock = LinearLayout(context)
-    private val current = label("", 14f)
-    private val change = action("R3", "Change disc", true) { open() }
-    private var updating = false
-    private val analog = switch("Analog controls", toggleAnalog)
-    private val fastForward = switch("Fast-forward", toggleFastForward)
-    private val art = ImageView(context)
-    private val played = label("", 14f)
-    private val battery = label("", 14f)
+    private val resume: () -> Unit,
+) : AbstractComposeView(context) {
+    private enum class Sheet {
+        DISCS,
+        FAST_FORWARD,
+    }
+
+    private data class Status(
+        val count: Int = 0,
+        val index: Int = 0,
+        val popup: Boolean = false,
+        val failed: Boolean = false,
+        val showAnalog: Boolean = false,
+        val analogEnabled: Boolean = true,
+        val fastForwarding: Boolean = false,
+        val played: String = "",
+        val battery: String = "",
+    )
+
+    private var status by mutableStateOf(Status())
+    private var sheet by mutableStateOf<Sheet?>(null)
+    private var highlighted by mutableIntStateOf(0)
+    private var settings by mutableStateOf(fastForwardSettings)
+    private var art by mutableStateOf<ImageBitmap?>(null)
     private var batteryAt = 0L
-    private val resumeButton = action(null, "Resume", true) { resume() }
-    private val discRow = LinearLayout(context)
-    private val divider = View(context)
-    private val analogRow = LinearLayout(context)
-    private val analogDivider = View(context)
-    private val fastForwardRow = LinearLayout(context)
-    private var settings = fastForwardSettings
-    private val settingsSummary = label("", 14f)
-    private val settingValues = ArrayList<TextView>()
-    private var choosingDisc = true
-    private val panelTitle = label("", 28f, true)
-    private val discFooter = LinearLayout(context)
-    private val settingsFooter = LinearLayout(context)
-    private val panel = LinearLayout(context)
-    private val rows = LinearLayout(context)
-    private val scroll = ScrollView(context)
-    private val choices = ArrayList<View>()
-    private var count = 0
-    private var index = 0
-    private var selected = 0
-    var isOpen = false
-        private set
+    private val paper = Color(0xFFFBF7EF)
+
+    val isOpen
+        get() = sheet != null
 
     init {
         visibility = GONE
         isClickable = true
-        setBackgroundColor(0xff3f3024.toInt())
-        art.scaleType = ImageView.ScaleType.CENTER_CROP
-        addView(art, LayoutParams(MATCH_PARENT, MATCH_PARENT))
-        addView(
-            View(context).apply {
-                background =
-                    GradientDrawable(
-                        GradientDrawable.Orientation.TOP_BOTTOM,
-                        intArrayOf(0xb33f3024.toInt(), 0xd93f3024.toInt(), 0xfa3f3024.toInt()),
-                    )
-            },
-            LayoutParams(MATCH_PARENT, MATCH_PARENT),
-        )
-        val bar = LinearLayout(context)
-        bar.gravity = Gravity.CENTER_VERTICAL
-        bar.setPadding(dp(24), dp(16), dp(16), 0)
-        val clock =
-            TextClock(context).apply {
-                format12Hour = "h:mm"
-                format24Hour = "HH:mm"
-                textSize = 16f
-                typeface = bold
-                setTextColor(paper)
-            }
-        bar.addView(clock)
-        battery.setTextColor(paperMuted)
-        bar.addView(
-            battery,
-            LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply {
-                marginStart = dp(12)
-            },
-        )
-        bar.addView(action(null, "Library", false) { leave() })
-        bar.addView(
-            resumeButton,
-            LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { marginStart = dp(8) },
-        )
-        addView(bar, LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP))
-
-        val column = LinearLayout(context)
-        column.orientation = LinearLayout.VERTICAL
-        column.gravity = Gravity.CENTER_HORIZONTAL
-        column.clipChildren = false
-        val heading =
-            label(title.orEmpty(), 24f, true).apply {
-                setTextColor(paper)
-                gravity = Gravity.CENTER
-                maxLines = 2
-                ellipsize = TextUtils.TruncateAt.END
-                visibility = if (title.isNullOrEmpty()) GONE else VISIBLE
-            }
-        column.addView(heading, LinearLayout.LayoutParams(dp(420), WRAP_CONTENT))
-        played.setTextColor(0xfff5bc45.toInt())
-        column.addView(
-            played,
-            LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
-                topMargin = dp(4)
-                bottomMargin = dp(16)
-            },
-        )
-        dock.orientation = LinearLayout.VERTICAL
-        dock.setPadding(dp(16), dp(8), dp(16), dp(8))
-        dock.background = background(surface, 26, line)
-        dock.elevation = dp(3).toFloat()
-        dock.outlineAmbientShadowColor = 0x244b3928
-        dock.outlineSpotShadowColor = 0x384b3928
-        dock.clipChildren = false
-        clipChildren = false
-        discRow.gravity = Gravity.CENTER_VERTICAL
-        discRow.addView(current, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-        discRow.addView(change)
-        dock.addView(discRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-        addDivider(divider)
-        switchRow(analogRow, "Analog controls", analog)
-        addDivider(analogDivider)
-        switchRow(fastForwardRow, "Fast-forward", fastForward)
-        addDivider(View(context))
-        val settingsRow = LinearLayout(context)
-        settingsRow.gravity = Gravity.CENTER_VERTICAL
-        settingsRow.minimumHeight = dp(48)
-        settingsRow.setOnClickListener { openSettings() }
-        settingsRow.addView(
-            label("Fast-forward settings", 16f, true),
-            LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f),
-        )
-        settingsRow.addView(settingsSummary)
-        dock.addView(settingsRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-        summarize()
-        column.addView(dock, LinearLayout.LayoutParams(dp(340), WRAP_CONTENT))
-        addView(
-            column,
-            LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
-                .apply { bottomMargin = dp(24) },
-        )
-
-        panel.orientation = LinearLayout.VERTICAL
-        panel.setPadding(dp(24), dp(24), dp(24), dp(24))
-        panel.setBackgroundColor(cream)
-        panel.visibility = GONE
-        panel.isClickable = true
-        panel.addView(panelTitle)
-        rows.orientation = LinearLayout.VERTICAL
-        scroll.isFillViewport = false
-        scroll.clipToPadding = false
-        scroll.setPadding(0, dp(16), 0, dp(16))
-        scroll.addView(rows)
-        panel.addView(scroll, LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f))
-        discFooter.gravity = Gravity.CENTER_VERTICAL
-        discFooter.addView(action("B", "Cancel", false) { close() })
-        discFooter.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
-        discFooter.addView(action("A", "Insert disc", true) { confirm() })
-        panel.addView(discFooter)
-        settingsFooter.gravity = Gravity.CENTER_VERTICAL
-        settingsFooter.addView(action("B", "Done", false) { close() })
-        settingsFooter.addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
-        settingsFooter.addView(action("A", "Change", true) { confirm() })
-        panel.addView(settingsFooter)
-        addView(panel, LayoutParams(MATCH_PARENT, MATCH_PARENT))
     }
 
-    fun art(bitmap: Bitmap) = art.setImageBitmap(bitmap)
+    fun art(bitmap: Bitmap) {
+        art = bitmap.asImageBitmap()
+    }
 
     /**
      * `played` is the game's total play time in milliseconds. A `popup` covers a dual-screen game's
@@ -226,21 +127,8 @@ class PlayControls(
         fastForwarding: Boolean,
         played: Long,
     ) {
-        this.count = count
-        this.index = index
         visibility = if (ready) VISIBLE else GONE
-        resumeButton.visibility = if (popup) VISIBLE else GONE
-        discRow.visibility = if (count > 1) VISIBLE else GONE
-        divider.visibility = if (count > 1 && showAnalog) VISIBLE else GONE
-        analogRow.visibility = if (showAnalog) VISIBLE else GONE
-        analogDivider.visibility = if (count > 1 || showAnalog) VISIBLE else GONE
-        updating = true
-        analog.isChecked = analogEnabled
-        fastForward.isChecked = fastForwarding
-        updating = false
-        current.text = if (failed) "Couldn’t change disc · Retry" else "Disc ${index + 1} of $count"
-        val playedText = "${PlayTime.duration(played)} played"
-        if (this.played.text.toString() != playedText) this.played.text = playedText
+        var battery = status.battery
         val now = SystemClock.uptimeMillis()
         if (batteryAt == 0L || now - batteryAt > 30_000) {
             batteryAt = now
@@ -248,264 +136,397 @@ class PlayControls(
                 context
                     .getSystemService(BatteryManager::class.java)
                     ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
-            battery.text = if (level in 0..100) "$level%" else ""
+            battery = if (level in 0..100) "$level%" else ""
         }
+        status =
+            Status(
+                count,
+                index,
+                popup,
+                failed,
+                showAnalog,
+                analogEnabled,
+                fastForwarding,
+                "${PlayTime.duration(played)} played",
+                battery,
+            )
     }
 
     /** Opens the disc chooser. */
     fun open() {
-        if (count < 2 || isOpen) return
-        sheet(true, "Change disc")
-        selected = index.coerceIn(0, count - 1)
-        repeat(count) { disc ->
-            choice(
-                label("Disc ${disc + 1}" + if (disc == index) "   ·   Inserted" else "", 18f, true),
-            ) {
-                selected = disc
-                confirm()
-            }
-        }
-        highlight()
+        if (status.count < 2 || isOpen) return
+        opened()
+        highlighted = status.index.coerceIn(0, status.count - 1)
+        sheet = Sheet.DISCS
     }
 
     private fun openSettings() {
         if (isOpen) return
-        sheet(false, "Fast-forward")
-        selected = 0
-        FAST_FORWARD_OPTIONS.forEachIndexed { option, it ->
-            val value = label("", 18f)
-            settingValues.add(value)
-            val row = LinearLayout(context)
-            row.gravity = Gravity.CENTER_VERTICAL
-            row.addView(label(it.label, 18f, true), LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-            row.addView(value)
-            choice(row) {
-                selected = option
-                confirm()
-            }
-        }
-        summarize()
-        highlight()
-    }
-
-    private fun sheet(discs: Boolean, title: String) {
         opened()
-        isOpen = true
-        choosingDisc = discs
-        panelTitle.text = title
-        discFooter.visibility = if (discs) VISIBLE else GONE
-        settingsFooter.visibility = if (discs) GONE else VISIBLE
-        dock.visibility = GONE
-        panel.visibility = VISIBLE
-        rows.removeAllViews()
-        choices.clear()
-        settingValues.clear()
-    }
-
-    private fun choice(row: View, clicked: () -> Unit) {
-        row.setPadding(dp(20), dp(16), dp(20), dp(16))
-        row.isClickable = true
-        relief(row)
-        row.setOnClickListener { clicked() }
-        rows.addView(
-            row,
-            LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { bottomMargin = dp(8) },
-        )
-        choices.add(row)
-    }
-
-    /** Moves the selected fast-forward setting `step` values along. */
-    private fun cycle(step: Int) {
-        val option = FAST_FORWARD_OPTIONS[selected]
-        val values = option.values
-        val value =
-            values[Math.floorMod(values.indexOf(settings.getValue(option.key)) + step, values.size)]
-        settings = settings + (option.key to value)
-        changeFastForward(option.key, value)
-        summarize()
-    }
-
-    private fun summarize() {
-        FAST_FORWARD_OPTIONS.forEachIndexed { option, it ->
-            settingValues.getOrNull(option)?.text = it.label(settings.getValue(it.key))
-        }
-        val speed = FAST_FORWARD_OPTIONS[2].label(settings.getValue("speed"))
-        settingsSummary.text =
-            if (settings["button"] == "off") speed
-            else "${FAST_FORWARD_OPTIONS[0].label(settings.getValue("button"))} · $speed"
+        highlighted = 0
+        sheet = Sheet.FAST_FORWARD
     }
 
     fun close() {
         if (!isOpen) return
-        isOpen = false
-        panel.visibility = GONE
-        dock.visibility = VISIBLE
+        sheet = null
         dismissed()
     }
 
     fun key(event: KeyEvent): Boolean {
-        if (!isOpen) return false
-        if (event.action == KeyEvent.ACTION_DOWN) {
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_UP -> {
-                    selected = (selected - 1 + choices.size) % choices.size
-                    highlight()
-                }
-                KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    selected = (selected + 1) % choices.size
-                    highlight()
-                }
-                KeyEvent.KEYCODE_DPAD_LEFT -> if (!choosingDisc) cycle(-1)
-                KeyEvent.KEYCODE_DPAD_RIGHT -> if (!choosingDisc) cycle(1)
-                KeyEvent.KEYCODE_BUTTON_A,
-                KeyEvent.KEYCODE_DPAD_CENTER,
-                KeyEvent.KEYCODE_ENTER -> if (event.repeatCount == 0) confirm()
-                KeyEvent.KEYCODE_BUTTON_B,
-                KeyEvent.KEYCODE_BACK,
-                KeyEvent.KEYCODE_ESCAPE,
-                KeyEvent.KEYCODE_BUTTON_THUMBR -> if (event.repeatCount == 0) close()
-            }
+        val sheet = sheet ?: return false
+        if (event.action != KeyEvent.ACTION_DOWN) return true
+        val rows = if (sheet == Sheet.DISCS) status.count else FAST_FORWARD_OPTIONS.size
+        val first = event.repeatCount == 0
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP -> highlighted = (highlighted - 1 + rows) % rows
+            KeyEvent.KEYCODE_DPAD_DOWN -> highlighted = (highlighted + 1) % rows
+            KeyEvent.KEYCODE_DPAD_LEFT -> if (sheet == Sheet.FAST_FORWARD) step(-1)
+            KeyEvent.KEYCODE_DPAD_RIGHT -> if (sheet == Sheet.FAST_FORWARD) step(1)
+            KeyEvent.KEYCODE_BUTTON_A,
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER -> if (first) if (sheet == Sheet.DISCS) insert() else close()
+            KeyEvent.KEYCODE_BUTTON_B,
+            KeyEvent.KEYCODE_BACK,
+            KeyEvent.KEYCODE_ESCAPE,
+            KeyEvent.KEYCODE_BUTTON_THUMBR -> if (first) close()
         }
         return true
     }
 
-    private fun confirm() {
-        if (!choosingDisc) return cycle(1)
-        insert(selected)
+    private fun insert() {
+        insert(highlighted)
         close()
     }
 
-    private fun highlight() {
-        choices.forEachIndexed { choice, view ->
-            view.background =
-                background(
-                    if (choice == selected) 0xfff3dfb3.toInt() else surface,
-                    18,
-                    if (choice == selected) ring else line,
-                )
-            view.isSelected = choice == selected
-        }
-        choices.getOrNull(selected)?.let { row ->
-            scroll.post { scroll.smoothScrollTo(0, row.top) }
+    /** Moves the highlighted fast-forward setting `step` values along, stopping at either end. */
+    private fun step(step: Int) {
+        val option = FAST_FORWARD_OPTIONS[highlighted]
+        val current = option.values.indexOf(settings.getValue(option.key))
+        pick(option, (current + step).coerceIn(0, option.values.lastIndex))
+    }
+
+    private fun pick(option: CoreOption, value: Int) {
+        val chosen = option.values[value]
+        if (settings[option.key] == chosen) return
+        settings = settings + (option.key to chosen)
+        changeFastForward(option.key, chosen)
+    }
+
+    private fun label(key: String): String {
+        val option = FAST_FORWARD_OPTIONS.first { it.key == key }
+        return option.label(settings.getValue(key))
+    }
+
+    @Composable
+    override fun Content() {
+        Box(Modifier.fillMaxSize().background(Color(0xFF3F3024))) {
+            art?.let {
+                Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
+            Box(
+                Modifier.fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color(0xB33F3024), Color(0xD93F3024), Color(0xFA3F3024)),
+                        ),
+                    ),
+            )
+            when (sheet) {
+                null -> Dock()
+                Sheet.DISCS -> Discs()
+                Sheet.FAST_FORWARD -> FastForward()
+            }
         }
     }
 
-    private fun switch(description: String, toggled: () -> Unit) =
-        Switch(context).apply {
-            showText = false
-            thumbDrawable = background(surface, 14, line).apply { setSize(dp(28), dp(28)) }
-            trackDrawable = background(honey, 14).apply { setSize(dp(48), dp(28)) }
-            switchMinWidth = dp(48)
-            minHeight = dp(48)
-            contentDescription = description
-            thumbTintList = null
-            trackTintList =
-                ColorStateList(
-                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(honey, line),
+    @Composable
+    private fun Dock() {
+        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(
+                Modifier.fillMaxWidth()
+                    .padding(start = Miel.margin, top = Miel.gap, end = Miel.gap),
+                horizontalArrangement = Arrangement.spacedBy(Miel.spaceSm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Clock()
+                Text(
+                    status.battery,
+                    Modifier.weight(1f).padding(start = Miel.spaceXs),
+                    paper.copy(alpha = .8f),
+                    Miel.textBody,
                 )
-            setOnCheckedChangeListener { _, _ -> if (!updating) toggled() }
+                Pill(null, "Library", minWidth = 0.dp, primary = false) { leave() }
+                if (status.popup) Pill("B", "Resume", minWidth = 0.dp) { resume() }
+            }
+            Spacer(Modifier.weight(1f))
+            if (!title.isNullOrEmpty()) {
+                Text(
+                    title,
+                    Modifier.widthIn(max = 420.dp),
+                    paper,
+                    24.sp,
+                    FontWeight.Bold,
+                    align = TextAlign.Center,
+                    lines = 2,
+                )
+            }
+            Text(
+                status.played,
+                Modifier.padding(top = Miel.spaceXs, bottom = Miel.gap),
+                Miel.honey,
+                Miel.textBody,
+                FontWeight.SemiBold,
+            )
+            Column(
+                Modifier.padding(bottom = Miel.margin)
+                    .width(380.dp)
+                    .relief(RoundedCornerShape(Miel.radius), Miel.surface, height = 1.4f)
+                    .padding(horizontal = Miel.spaceXs, vertical = Miel.spaceXs),
+            ) {
+                if (status.count > 1) {
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .heightIn(min = 56.dp)
+                            .padding(start = Miel.inset, end = Miel.spaceXs),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            if (status.failed) "Couldn’t change disc · Retry"
+                            else "Disc ${status.index + 1} of ${status.count}",
+                            Modifier.weight(1f),
+                            Miel.ink,
+                            Miel.textBody,
+                            FontWeight.SemiBold,
+                        )
+                        Pill("R3", "Change disc", minWidth = 0.dp) { open() }
+                    }
+                    Divider()
+                }
+                if (status.showAnalog) {
+                    ToggleRow("Analog controls", status.analogEnabled, toggleAnalog)
+                    Divider()
+                }
+                ToggleRow("Fast-forward", status.fastForwarding, toggleFastForward)
+                Divider()
+                Pressable(Modifier.fillMaxWidth(), ::openSettings) { pressed ->
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .heightIn(min = 56.dp)
+                            .then(
+                                if (pressed)
+                                    Modifier.relief(
+                                        RoundedCornerShape(14.dp),
+                                        Miel.pressed,
+                                        inset = true,
+                                    )
+                                else Modifier,
+                            )
+                            .padding(horizontal = Miel.inset),
+                        horizontalArrangement = Arrangement.spacedBy(Miel.inset),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Fast-forward settings",
+                            Modifier.weight(1f),
+                            Miel.ink,
+                            Miel.textBody,
+                            FontWeight.SemiBold,
+                        )
+                        Text(
+                            if (settings["button"] == "off") label("speed")
+                            else "${label("button")} · ${label("speed")}",
+                            color = Miel.keyInk,
+                            size = Miel.textBody,
+                            weight = FontWeight.SemiBold,
+                        )
+                        Chevron(Miel.muted)
+                    }
+                }
+            }
         }
-
-    private fun switchRow(row: LinearLayout, text: String, switch: Switch) {
-        row.gravity = Gravity.CENTER_VERTICAL
-        row.setOnClickListener { switch.toggle() }
-        row.addView(label(text, 16f, true), LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-        row.addView(switch)
-        dock.addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
     }
 
-    private fun addDivider(view: View) {
-        view.setBackgroundColor(line)
-        dock.addView(
-            view,
-            LinearLayout.LayoutParams(MATCH_PARENT, dp(1)).apply {
-                topMargin = dp(12)
-                bottomMargin = dp(12)
-            },
+    @Composable
+    private fun Clock() {
+        var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(60_000 - now % 60_000)
+                now = System.currentTimeMillis()
+            }
+        }
+        val pattern = if (DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm"
+        Text(
+            SimpleDateFormat(pattern, Locale.getDefault()).format(Date(now)),
+            color = paper,
+            size = 16.sp,
+            weight = FontWeight.Bold,
         )
     }
 
-    /** A pill with a controller badge for `key`, or without one when it is null. */
-    private fun action(key: String?, text: String, primary: Boolean, clicked: () -> Unit): View =
-        LinearLayout(context).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(16), dp(10), dp(20), dp(10))
-            background =
-                background(
-                    if (primary) honey else surface,
-                    26,
-                )
-            isClickable = true
-            isFocusable = true
-            relief(this)
-            contentDescription = text
-            setOnClickListener { clicked() }
-            if (key == null) {
-                setPadding(dp(20), dp(10), dp(20), dp(10))
-                addView(label(text, 14f, true))
-                return@apply
-            }
-            val badge =
-                label(key, 12f, true).apply {
-                    gravity = Gravity.CENTER
-                    background =
-                        GradientDrawable().apply {
-                            shape = GradientDrawable.OVAL
-                            setColor(0)
-                            setStroke(
-                                dp(1),
-                                if (primary) 0xff7e561c.toInt() else 0xff957a50.toInt(),
-                            )
-                        }
-                }
-            addView(badge, LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginEnd = dp(10) })
-            addView(label(text, 14f, true))
-        }
-
-    private fun label(value: String, size: Float, bold: Boolean = false) =
-        TextView(context).apply {
-            text = value
-            textSize = size
-            setTextColor(if (bold) ink else muted)
-            typeface = if (bold) this@PlayControls.bold else regular
-        }
-
-    private fun background(color: Int, radius: Int, border: Int? = null) =
-        GradientDrawable(
-                GradientDrawable.Orientation.TL_BR,
-                when (color) {
-                    cream -> intArrayOf(0xfff8f2e8.toInt(), cream, 0xffeee5d6.toInt())
-                    surface -> intArrayOf(surface, 0xfffcf6eb.toInt(), 0xfff8efdf.toInt())
-                    honey -> intArrayOf(0xfff3bb48.toInt(), honey, 0xffe8a72f.toInt())
-                    else -> intArrayOf(color, color)
-                },
-            )
-            .apply {
-                cornerRadius = dp(radius).toFloat()
-                if (border != null) setStroke(dp(if (border == ring) 2 else 1), border)
-            }
-
-    private fun relief(view: View) {
-        view.outlineAmbientShadowColor = 0x244b3928
-        view.outlineSpotShadowColor = 0x384b3928
-        view.stateListAnimator =
-            StateListAnimator().apply {
-                fun state(attributes: IntArray, height: Int) {
-                    addState(
-                        attributes,
-                        ObjectAnimator.ofFloat(view, "elevation", dp(height).toFloat()).apply {
-                            duration = 160
-                            interpolator = DecelerateInterpolator()
-                        },
+    @Composable
+    private fun ToggleRow(label: String, checked: Boolean, toggled: () -> Unit) {
+        Pressable(Modifier.fillMaxWidth(), toggled) { pressed ->
+            Row(
+                Modifier.fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .then(
+                        if (pressed)
+                            Modifier.relief(RoundedCornerShape(14.dp), Miel.pressed, inset = true)
+                        else Modifier,
                     )
-                }
-                state(intArrayOf(android.R.attr.state_pressed), 0)
-                state(intArrayOf(android.R.attr.state_selected), 3)
-                state(intArrayOf(android.R.attr.state_focused), 3)
-                state(intArrayOf(), 2)
+                    .padding(horizontal = Miel.inset),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(label, Modifier.weight(1f), Miel.ink, Miel.textBody, FontWeight.SemiBold)
+                Toggle(checked)
             }
+        }
     }
 
-    private fun dp(value: Int) = (value * resources.displayMetrics.density).roundToInt()
+    /** A switch: an inset track, honey when on, with a raised thumb. */
+    @Composable
+    private fun Toggle(checked: Boolean) {
+        val offset by
+            animateDpAsState(if (checked) 22.dp else 0.dp, tween(160, easing = Miel.easeOut))
+        Box(
+            Modifier.size(52.dp, 30.dp)
+                .relief(
+                    RoundedCornerShape(15.dp),
+                    if (checked) Miel.honey else Miel.pressed,
+                    inset = true,
+                )
+                .padding(3.dp),
+        ) {
+            Box(
+                Modifier.offset(x = offset)
+                    .size(24.dp)
+                    .relief(CircleShape, Miel.surface, height = .6f),
+            )
+        }
+    }
+
+    @Composable
+    private fun Divider() {
+        Box(
+            Modifier.padding(horizontal = Miel.inset)
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(Miel.line),
+        )
+    }
+
+    /** A full-screen sheet in the library's Settings layout. */
+    @Composable
+    private fun Sheet(
+        title: String,
+        footer: @Composable RowScope.() -> Unit,
+        content: @Composable ColumnScope.() -> Unit,
+    ) {
+        Column(
+            Modifier.fillMaxSize().background(Miel.background).padding(Miel.margin),
+            verticalArrangement = Arrangement.spacedBy(Miel.gap),
+        ) {
+            Text(title, color = Miel.ink, size = 28.sp, weight = FontWeight.Bold)
+            Column(
+                Modifier.weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 6.dp, vertical = Miel.spaceSm),
+                content = content,
+            )
+            Box(Modifier.fillMaxWidth().height(1.dp).background(Miel.line))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                content = footer,
+            )
+        }
+    }
+
+    @Composable
+    private fun Discs() {
+        Sheet(
+            "Change disc",
+            footer = {
+                Pill("B", "Cancel", primary = false) { close() }
+                Pill("A", "Insert disc") { insert() }
+            },
+        ) {
+            Column(
+                Modifier.fillMaxWidth()
+                    .relief(RoundedCornerShape(Miel.tileRadius), Miel.background, inset = true)
+                    .padding(Miel.spaceXs),
+                verticalArrangement = Arrangement.spacedBy(Miel.spaceXs),
+            ) {
+                repeat(status.count) { disc ->
+                    MoreRow(
+                        "Disc ${disc + 1}" + if (disc == status.index) "   ·   Inserted" else "",
+                        disc == highlighted,
+                        false,
+                    ) {
+                        highlighted = disc
+                        insert()
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun FastForward() {
+        Sheet("Fast-forward", footer = { Pill("B", "Done", primary = false) { close() } }) {
+            Column(
+                Modifier.fillMaxWidth()
+                    .relief(RoundedCornerShape(Miel.tileRadius), Miel.surface, height = .7f)
+                    .padding(Miel.spaceXs),
+            ) {
+                FAST_FORWARD_OPTIONS.forEachIndexed { row, option ->
+                    val chosen = row == highlighted
+                    Pressable(
+                        Modifier.fillMaxWidth().semantics { selected = chosen },
+                        { highlighted = row },
+                    ) { pressed ->
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .heightIn(min = 60.dp)
+                                .then(
+                                    if (chosen || pressed)
+                                        Modifier.relief(
+                                            RoundedCornerShape(14.dp),
+                                            if (pressed) Miel.pressed else Miel.selection,
+                                            inset = true,
+                                        )
+                                    else Modifier,
+                                )
+                                .padding(horizontal = Miel.inset, vertical = Miel.spaceSm),
+                            horizontalArrangement = Arrangement.spacedBy(Miel.inset),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                option.label,
+                                Modifier.weight(1f),
+                                Miel.ink,
+                                Miel.textBody,
+                                FontWeight.SemiBold,
+                            )
+                            Segmented(
+                                option.labels,
+                                option.values.indexOf(settings.getValue(option.key)),
+                                optionWidth =
+                                    if (option.labels.any { it.length > 4 }) 76.dp else 52.dp,
+                                height = 40.dp,
+                            ) {
+                                highlighted = row
+                                pick(option, it)
+                            }
+                        }
+                    }
+                    if (row != FAST_FORWARD_OPTIONS.lastIndex) Divider()
+                }
+            }
+        }
+    }
 }

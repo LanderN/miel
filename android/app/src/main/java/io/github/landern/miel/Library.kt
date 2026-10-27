@@ -96,7 +96,7 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
 
 /** Shared metrics and palette for the library, its controls and dialogs. */
-private object Miel {
+internal object Miel {
     val spaceXs = 4.dp
     val spaceSm = 8.dp
     val inset = 12.dp
@@ -744,7 +744,7 @@ private fun Dots(total: Int, position: Int) {
 
 /** Calls `onClick` on a tap without a ripple; `content` gets whether it is pressed. */
 @Composable
-private fun Pressable(
+internal fun Pressable(
     modifier: Modifier,
     onClick: () -> Unit,
     content: @Composable (pressed: Boolean) -> Unit,
@@ -756,7 +756,7 @@ private fun Pressable(
 
 /** A control settles toward its contact shadow on press and returns without overshoot. */
 @Composable
-private fun Modifier.controlSurface(
+internal fun Modifier.controlSurface(
     shape: Shape,
     face: Color,
     pressed: Boolean,
@@ -770,10 +770,10 @@ private fun Modifier.controlSurface(
         .relief(shape, face, height = depth)
 }
 
-/** A raised cream or honey action with a printed controller badge. */
+/** A raised cream or honey action with a printed controller badge, if `key` is set. */
 @Composable
-private fun RowScope.Pill(
-    key: String,
+internal fun RowScope.Pill(
+    key: String?,
     label: String,
     minWidth: Dp = 140.dp,
     primary: Boolean = true,
@@ -808,7 +808,7 @@ private fun RowScope.Pill(
                 Arrangement.spacedBy(Miel.spaceSm, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ControllerBadge(key, Modifier.size(26.dp), face)
+            if (key != null) ControllerBadge(key, Modifier.size(26.dp), face)
             Text(
                 label,
                 color = if (destructive) Color(0xFF9A455A) else Miel.ink,
@@ -822,7 +822,7 @@ private fun RowScope.Pill(
 
 /** One choice out of a few, as a row of segments. */
 @Composable
-private fun Segmented(
+internal fun Segmented(
     options: List<String>,
     current: Int,
     optionWidth: Dp? = 44.dp,
@@ -918,7 +918,7 @@ private fun Dialog(
 
 /** One action in More, with the selection inset. */
 @Composable
-private fun MoreRow(label: String, chosen: Boolean, destructive: Boolean, onClick: () -> Unit) {
+internal fun MoreRow(label: String, chosen: Boolean, destructive: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(14.dp)
     Pressable(Modifier.fillMaxWidth().semantics { selected = chosen }, onClick) { pressed ->
         val face by
@@ -1235,25 +1235,30 @@ private fun SettingsOption(
                     command(Command.GameRows(it + 1))
                 }
             } else {
-                Canvas(Modifier.size(16.dp)) {
-                    val color = if (chosen) Miel.keyInk else Miel.muted
-                    drawLine(
-                        color,
-                        Offset(size.width * .35f, size.height * .2f),
-                        Offset(size.width * .65f, size.height * .5f),
-                        2.dp.toPx(),
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                    )
-                    drawLine(
-                        color,
-                        Offset(size.width * .65f, size.height * .5f),
-                        Offset(size.width * .35f, size.height * .8f),
-                        2.dp.toPx(),
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round,
-                    )
-                }
+                Chevron(if (chosen) Miel.keyInk else Miel.muted)
             }
         }
+    }
+}
+
+/** A right-pointing chevron for a row that opens more. */
+@Composable
+internal fun Chevron(color: Color) {
+    Canvas(Modifier.size(16.dp)) {
+        drawLine(
+            color,
+            Offset(size.width * .35f, size.height * .2f),
+            Offset(size.width * .65f, size.height * .5f),
+            2.dp.toPx(),
+            cap = StrokeCap.Round,
+        )
+        drawLine(
+            color,
+            Offset(size.width * .65f, size.height * .5f),
+            Offset(size.width * .35f, size.height * .8f),
+            2.dp.toPx(),
+            cap = StrokeCap.Round,
+        )
     }
 }
 
@@ -1412,7 +1417,7 @@ private fun SaveConflict(overlay: Overlay.SaveConflict, command: (Command) -> Un
 }
 
 @Composable
-private fun Text(
+internal fun Text(
     text: String,
     modifier: Modifier = Modifier,
     color: Color,

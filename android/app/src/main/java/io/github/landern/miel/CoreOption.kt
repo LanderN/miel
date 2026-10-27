@@ -405,8 +405,8 @@ val FAST_FORWARD_OPTIONS =
         CoreOption(
             "speed",
             "Maximum speed",
-            listOf("2", "3", "4", "6", "8"),
-            listOf("2×", "3×", "4×", "6×", "8×"),
+            listOf("1.5", "2", "3", "4", "6", "8"),
+            listOf("1.5×", "2×", "3×", "4×", "6×", "8×"),
             "3",
         ),
         CoreOption("sound", "Sound", listOf("on", "off"), listOf("On", "Off")),

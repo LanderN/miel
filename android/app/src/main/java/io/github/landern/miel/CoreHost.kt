@@ -70,7 +70,7 @@ object CoreHost {
      * Runs the game at up to `speed` times its rate; with `sound`, its audio plays faster at its
      * original pitch.
      */
-    @JvmStatic external fun fastForward(on: Boolean, speed: Int, sound: Boolean)
+    @JvmStatic external fun fastForward(on: Boolean, speed: Float, sound: Boolean)
 
     /** The stronger port-zero rumble motor, from 0 to 65535; zero while paused or stopped. */
     @JvmStatic external fun rumble(): Int
