@@ -16,7 +16,8 @@ public:
     bool visible(int slot) const {
         return outputs[slot].window && outputs[slot].swapchain != VK_NULL_HANDLE;
     }
-    unsigned present(unsigned width, unsigned height, bool stacked, float lowerInset);
+    unsigned present(unsigned width, unsigned height, bool stacked, float lowerInset,
+                     int64_t presentAt);
     void wait();
     void idle();
     void cleanup();
@@ -39,6 +40,7 @@ private:
     VkFence fence = VK_NULL_HANDLE;
     bool submitted = false;
     bool negotiated = false;
+    bool displayTiming = false;
     const retro_hw_render_context_negotiation_interface_vulkan* negotiation = nullptr;
     const retro_vulkan_image* image = nullptr;
     std::vector<VkSemaphore> waits;

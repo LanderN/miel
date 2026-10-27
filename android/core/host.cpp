@@ -37,6 +37,8 @@ namespace {
 using Clock = std::chrono::steady_clock;
 
 constexpr char kTag[] = "MielCore";
+// Frame periods from a frame's scheduled start to the presentation time requested for it.
+constexpr int kPresentLead = 3;
 // Checkpoint envelope: magic, identity length (u32), identity (core name and version), payload
 // length (u64), FNV-1a 64 checksum of the payload, payload. Integers are little-endian.
 constexpr char kStateMagic[] = "THORAZ02";
@@ -149,6 +151,9 @@ unsigned width = 400, height = 480, allocatedWidth = 0, allocatedHeight = 0;
 retro_hw_render_callback hw{};
 VulkanVideo vulkan;
 bool useVulkan = false;
+// Steady-clock time in nanoseconds at which the current Vulkan frame should reach the displays,
+// kPresentLead frame periods after its scheduled start.
+int64_t presentAt = 0;
 const retro_hw_render_context_negotiation_interface_vulkan* vkNegotiation = nullptr;
 retro_pixel_format format = RETRO_PIXEL_FORMAT_XRGB8888;
 retro_frame_time_callback frameTime{};
@@ -339,7 +344,7 @@ void video(const void* data, unsigned w, unsigned h, size_t pitch) {
     if (useVulkan) {
         require(data == RETRO_HW_FRAME_BUFFER_VALID, "Vulkan core returned a software frame");
         uint64_t start = micros();
-        unsigned mask = vulkan.present(w, h, stacked, lowerInset);
+        unsigned mask = vulkan.present(w, h, stacked, lowerInset, presentAt);
         if (mask & 1) lowerFrames++;
         if (mask & 2) upperFrames++;
         presentMicros += micros() - start;
@@ -1017,6 +1022,8 @@ void loop(const Launch& launch, double fps) {
     PerformanceHint hint(fps);
     Stats stats;
     const auto interval = kDiagnosticCheckpoint;
+    const auto period =
+        std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(1. / fps));
     auto next = Clock::now(), checkpointDue = next + interval;
     std::future<bool> writing;
     bool writingExit = false, writingPeriodic = false;
@@ -1093,6 +1100,9 @@ void loop(const Launch& launch, double fps) {
         }
         if (frameTime.callback) frameTime.callback(retro_usec_t(1000000. / fps));
         if (asyncAudio.callback) asyncAudio.callback();
+        presentAt = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        (next + period * kPresentLead).time_since_epoch())
+                        .count();
         uint64_t start = micros();
         api.run();
         uint64_t spent = micros() - start;
@@ -1105,8 +1115,7 @@ void loop(const Launch& launch, double fps) {
             checkpointDue = Clock::now() + interval;
         }
         // Pace without vsync; after a stall of over 100 ms, start counting again from now.
-        next +=
-            std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(1. / fps));
+        next += period;
         if (next > Clock::now()) {
             uint64_t sleepStart = micros();
             std::this_thread::sleep_until(next);

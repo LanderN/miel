@@ -52,10 +52,21 @@ void VulkanVideo::setup(const retro_hw_render_context_negotiation_interface_vulk
     check(vkEnumeratePhysicalDevices(interface.instance, &count, devices.data()),
           "Read Vulkan GPUs");
     retro_vulkan_context context{};
-    const char* deviceExtensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+    uint32_t extensionCount = 0;
+    check(vkEnumerateDeviceExtensionProperties(devices.front(), nullptr, &extensionCount, nullptr),
+          "Count Vulkan device extensions");
+    std::vector<VkExtensionProperties> available(extensionCount);
+    check(vkEnumerateDeviceExtensionProperties(devices.front(), nullptr, &extensionCount,
+                                               available.data()),
+          "Read Vulkan device extensions");
+    displayTiming = std::any_of(available.begin(), available.end(), [](const auto& extension) {
+        return std::string(extension.extensionName) == VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME;
+    });
+    const char* deviceExtensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                                      VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME};
     if (!negotiation->create_device(&context, interface.instance, devices.front(), VK_NULL_HANDLE,
-                                    vkGetInstanceProcAddr, deviceExtensions, 1, nullptr, 0,
-                                    nullptr))
+                                    vkGetInstanceProcAddr, deviceExtensions, displayTiming ? 2 : 1,
+                                    nullptr, 0, nullptr))
         throw std::runtime_error("Core could not create Vulkan device");
     negotiated = true;
     interface.gpu = context.gpu;
@@ -211,20 +222,6 @@ void VulkanVideo::createSwapchain(Output& output) {
     if (!(capabilities.supportedCompositeAlpha & create.compositeAlpha))
         create.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
     create.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-    uint32_t modeCount = 0;
-    check(vkGetPhysicalDeviceSurfacePresentModesKHR(interface.gpu, output.surface, &modeCount,
-                                                    nullptr),
-          "Read Vulkan present modes");
-    std::vector<VkPresentModeKHR> modes(modeCount);
-    check(vkGetPhysicalDeviceSurfacePresentModesKHR(interface.gpu, output.surface, &modeCount,
-                                                    modes.data()),
-          "Read Vulkan present modes");
-    for (auto mode : {VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR}) {
-        if (std::find(modes.begin(), modes.end(), mode) != modes.end()) {
-            create.presentMode = mode;
-            break;
-        }
-    }
     create.clipped = true;
     check(vkCreateSwapchainKHR(interface.device, &create, nullptr, &output.swapchain),
           "Create Vulkan swapchain");
@@ -242,7 +239,8 @@ void VulkanVideo::createSwapchain(Output& output) {
               "Create Vulkan present semaphore");
 }
 
-unsigned VulkanVideo::present(unsigned width, unsigned height, bool stacked, float lowerInset) {
+unsigned VulkanVideo::present(unsigned width, unsigned height, bool stacked, float lowerInset,
+                              int64_t presentAt) {
     if (!image) return 0;
     wait();
     VkFormatProperties properties{};
@@ -336,6 +334,11 @@ unsigned VulkanVideo::present(unsigned width, unsigned height, bool stacked, flo
         present.swapchainCount = swapchains.size();
         present.pSwapchains = swapchains.data();
         present.pImageIndices = indices.data();
+        std::vector<VkPresentTimeGOOGLE> times(swapchains.size(), {0, uint64_t(presentAt)});
+        VkPresentTimesInfoGOOGLE timing{VK_STRUCTURE_TYPE_PRESENT_TIMES_INFO_GOOGLE};
+        timing.swapchainCount = times.size();
+        timing.pTimes = times.data();
+        if (displayTiming) present.pNext = &timing;
         std::vector<VkResult> results(swapchains.size());
         present.pResults = results.data();
         VkResult result = vkQueuePresentKHR(interface.queue, &present);
