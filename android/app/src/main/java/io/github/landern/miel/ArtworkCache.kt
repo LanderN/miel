@@ -292,7 +292,7 @@ class ArtworkCache(
                 kind,
                 system,
                 source,
-                fetchBytes(source, IMAGE_LIMIT, LIBRETRO_TIMEOUT),
+                fetchBytes(source, IMAGE_LIMIT, LIBRETRO_TIMEOUT, LIBRETRO_TIMEOUT),
             )
 
         private fun cacheImage(
@@ -394,7 +394,12 @@ class ArtworkCache(
             try {
                 val html =
                     String(
-                        fetchBytes(LibretroArt.listingUrl(system, kind), LISTING_LIMIT, LIBRETRO_TIMEOUT),
+                        fetchBytes(
+                            LibretroArt.listingUrl(system, kind),
+                            LISTING_LIMIT,
+                            LIBRETRO_TIMEOUT,
+                            LIBRETRO_TIMEOUT,
+                        ),
                     )
                 if (LibretroArt.filenames(html).isEmpty()) {
                     throw IOException("Empty thumbnail listing")
