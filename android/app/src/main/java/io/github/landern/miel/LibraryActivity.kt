@@ -18,11 +18,14 @@ import android.view.Display
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.View
+import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -58,6 +61,7 @@ class LibraryActivity : ComponentActivity() {
     private lateinit var apps: AppList
     private val displayListener = Displays.Listener(this) { ArtworkActivity.show(this) }
     private var overlay by mutableStateOf<Overlay?>(null)
+    private val keyFocus by lazy { View(this).apply { isFocusableInTouchMode = true } }
 
     /** Bumped whenever new artwork is cached. */
     private var artworkVersion by mutableIntStateOf(0)
@@ -143,7 +147,11 @@ class LibraryActivity : ComponentActivity() {
             Library(session, overlay, art, ::command)
             val hero = hero()
             SideEffect { ArtworkActivity.update(hero) }
+            val typing = overlay is Overlay.RomMAddress
+            LaunchedEffect(typing) { if (!typing) keyFocus.requestFocus() }
         }
+        // Leaving touch mode consumes the first navigation key unless a plain View holds focus.
+        addContentView(keyFocus, ViewGroup.LayoutParams(1, 1))
         displayListener.register()
         ArtworkActivity.show(this)
     }
@@ -1126,6 +1134,11 @@ class LibraryActivity : ComponentActivity() {
     }
 
     // Input.
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && overlay !is Overlay.RomMAddress) keyFocus.requestFocus()
+    }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (MediaVolume.key(this, event)) return true
