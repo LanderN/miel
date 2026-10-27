@@ -49,6 +49,7 @@ constexpr uint64_t kFnvOffset = 1469598103934665603ull, kFnvPrime = 109951162821
 constexpr unsigned kMaxFrameSize = 4096;
 // Audio is held back after a start, pause or underrun until this much is queued.
 constexpr double kAudioPrefillSeconds = 0.05;
+constexpr double kStretchQueueSeconds = 0.1;
 // Diagnostic sessions checkpoint this often; games only on Home, Back and pause, because
 // Azahar's serialize stalls emulation for most of a second.
 constexpr auto kDiagnosticCheckpoint = std::chrono::milliseconds(1500);
@@ -105,7 +106,7 @@ std::atomic<unsigned> discCount{0}, discIndex{0};
 std::atomic<bool> discFailed{false};
 std::atomic<bool> fastForward{false}, fastForwardSound{true};
 std::atomic<int> fastForwardSpeed{3};
-// Frames run per frame period, measured over recent frames.
+// Frames run per frame period: the period over the recent average frame time.
 std::atomic<double> speed{1};
 double audioRate = 32768;
 
@@ -496,8 +497,8 @@ private:
 Stretch stretch;
 std::atomic<bool> stretching{false};
 
-// During fast-forward the measured speed sets the stretch, leaning on the queue's fill so output
-// neither runs dry nor overflows.
+// During fast-forward the measured speed sets the stretch, leaning on the queue's fill around
+// kStretchQueueSeconds so output neither runs dry nor overflows.
 size_t audio(const int16_t* data, size_t count) {
     audioFrames += count;
     if (!fastForward) {
@@ -510,8 +511,8 @@ size_t audio(const int16_t* data, size_t count) {
     size_t queued =
         (audioWrite.load(std::memory_order_relaxed) - audioRead.load(std::memory_order_acquire)) /
         2;
-    double fill = double(queued) / std::max<size_t>(audioPrefill, 1);
-    stretch.add(data, count, std::max(1., speed.load()) * std::clamp(.75 + .25 * fill, .8, 1.25));
+    double fill = queued / (audioRate * kStretchQueueSeconds);
+    stretch.add(data, count, std::max(1., speed.load()) * std::clamp(.5 + .5 * fill, .5, 1.5));
     return count;
 }
 
@@ -1146,6 +1147,7 @@ void loop(const Launch& launch, double fps) {
     const auto period =
         std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(1. / fps));
     auto next = Clock::now(), checkpointDue = next + interval, lastFrame = next;
+    double averageFrame = 1. / fps;
     std::future<bool> writing;
     bool writingExit = false, writingPeriodic = false;
     uint64_t writeStart = 0, writingFrame = 0;
@@ -1252,10 +1254,9 @@ void loop(const Launch& launch, double fps) {
             next = Clock::now();
         }
         auto now = Clock::now();
-        if (now > lastFrame) {
-            double measured = std::chrono::duration<double>(period) / (now - lastFrame);
-            speed = speed + .05 * (std::min(measured, 16.) - speed);
-        }
+        averageFrame +=
+            .02 * (std::chrono::duration<double>(now - lastFrame).count() - averageFrame);
+        speed = std::min(1. / fps / std::max(averageFrame, 1e-6), 16.);
         lastFrame = now;
         stats.frame(spent);
     }
