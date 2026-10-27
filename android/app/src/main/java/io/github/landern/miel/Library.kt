@@ -65,13 +65,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -113,6 +118,9 @@ private object Miel {
     val surface = Color(0xFFFFFAF1)
     val ink = Color(0xFF4B3928)
     val muted = Color(0xFF6C5B46)
+    val softInk = Color(0xFF7A6850)
+    val cream = Color(0xFFFBF8F2)
+    val rose = Color(0xFF9A455A)
     val line = Color(0xFFDED2BD)
     val pressed = Color(0xFFEDE2CE)
     val selection = Color(0xFFF3E2BE)
@@ -461,12 +469,14 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
         above =
             if (session.gameRows == 1)
                 { index ->
-                    Text(
-                        session.games[index].platform,
-                        color = Miel.muted,
-                        size = Miel.textSmall,
-                        lines = 1,
-                    )
+                    // Platform tabs name the platform already; the space stays so rows don't shift.
+                    if (session.tab == Tab.RECENT)
+                        Text(
+                            session.games[index].platform,
+                            color = Miel.muted,
+                            size = Miel.textSmall,
+                            lines = 1,
+                        )
                 }
             else null,
         below =
@@ -479,7 +489,7 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
                     ) {
                         Text(
                             game.title,
-                            color = Miel.ink,
+                            color = if (index == session.selected) Miel.ink else Miel.softInk,
                             size = Miel.textBody,
                             weight = FontWeight.ExtraBold,
                             lineHeight = 18.sp,
@@ -518,19 +528,82 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
                     modifier,
                     contentScale = ContentScale.Crop,
                 )
-            if (game.rommId != 0) {
+            if (game.rommId != 0 && game.romUri.startsWith("romm:")) {
                 Box(
                     Modifier.padding(Miel.spaceSm)
-                        .background(Miel.background.copy(alpha = .94f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                        .size(26.dp)
+                        .background(Miel.cream.copy(alpha = .92f), CircleShape)
+                        .semantics { contentDescription = "On RomM, not downloaded" },
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        "RomM",
-                        color = Miel.keyInk,
-                        size = 10.sp,
-                        weight = FontWeight.SemiBold,
-                        lines = 1,
-                    )
+                    Canvas(Modifier.size(16.dp)) {
+                        val unit = size.width / 24f
+                        val cloud =
+                            Path().apply {
+                                moveTo(8f * unit, 17.5f * unit)
+                                lineTo(6.5f * unit, 17.5f * unit)
+                                cubicTo(
+                                    4f * unit,
+                                    17.5f * unit,
+                                    2.5f * unit,
+                                    15.7f * unit,
+                                    2.5f * unit,
+                                    13.5f * unit,
+                                )
+                                cubicTo(
+                                    2.5f * unit,
+                                    11.4f * unit,
+                                    4.1f * unit,
+                                    9.8f * unit,
+                                    6.1f * unit,
+                                    9.6f * unit,
+                                )
+                                cubicTo(
+                                    6.6f * unit,
+                                    7f * unit,
+                                    8.8f * unit,
+                                    5f * unit,
+                                    11.5f * unit,
+                                    5f * unit,
+                                )
+                                cubicTo(
+                                    14.4f * unit,
+                                    5f * unit,
+                                    16.7f * unit,
+                                    7.1f * unit,
+                                    17f * unit,
+                                    9.8f * unit,
+                                )
+                                cubicTo(
+                                    19.5f * unit,
+                                    9.9f * unit,
+                                    21.5f * unit,
+                                    11.8f * unit,
+                                    21.5f * unit,
+                                    14.2f * unit,
+                                )
+                                cubicTo(
+                                    21.5f * unit,
+                                    16.1f * unit,
+                                    20f * unit,
+                                    17.5f * unit,
+                                    18f * unit,
+                                    17.5f * unit,
+                                )
+                                lineTo(16f * unit, 17.5f * unit)
+                                moveTo(12f * unit, 11f * unit)
+                                lineTo(12f * unit, 20.5f * unit)
+                                moveTo(8.8f * unit, 17.3f * unit)
+                                lineTo(12f * unit, 20.5f * unit)
+                                lineTo(15.2f * unit, 17.3f * unit)
+                            }
+                        drawPath(
+                            cloud,
+                            Miel.keyInk,
+                            style =
+                                Stroke(1.8f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                        )
+                    }
                 }
             }
             if (cover?.boxart != true && session.gameRows != 1) {
@@ -616,17 +689,17 @@ private fun Tile(
     val pressed by interaction.collectIsPressedAsState()
     val height by
         animateFloatAsState(
-            if (pressed) .4f else if (chosen) 2.2f else .75f,
+            if (pressed) .4f else if (chosen) 3.2f else .75f,
             tween(if (pressed) 90 else 180, easing = Miel.easeOut),
         )
     val scale by
         animateFloatAsState(
-            if (pressed) .99f else if (chosen) 1.055f else 1f,
+            if (pressed) .99f else if (chosen) 1.06f else 1f,
             spring(dampingRatio = 1f, stiffness = 450f),
         )
     val rise by
         animateDpAsState(
-            if (chosen && !pressed) (-4).dp else 0.dp,
+            if (chosen && !pressed) (-6).dp else 0.dp,
             spring(dampingRatio = 1f, stiffness = 450f),
         )
     Box(
@@ -639,7 +712,11 @@ private fun Tile(
             .softShadow(shape, height)
             .clip(shape)
             .background(background)
-            .border(if (border) 1.dp else 2.dp, if (chosen) Miel.background else Miel.line, shape)
+            .border(
+                if (chosen) 3.dp else if (border) 1.dp else 2.dp,
+                if (chosen) Miel.cream else Miel.line,
+                shape,
+            )
             .semantics { selected = chosen }
             .clickable(interaction, null, onClick = onClick),
     ) {
@@ -808,7 +885,11 @@ private fun Segmented(
 
 /** A dialog over a scrim that keeps the library inert behind it. */
 @Composable
-private fun Dialog(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun Dialog(
+    title: String,
+    detail: String = "",
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Box(
         Modifier.fillMaxSize().background(Color(0x66493922)).clickable(
             remember { MutableInteractionSource() },
@@ -825,8 +906,48 @@ private fun Dialog(title: String, content: @Composable ColumnScope.() -> Unit) {
                 .padding(Miel.margin),
             verticalArrangement = Arrangement.spacedBy(Miel.gap),
         ) {
-            Text(title, color = Miel.ink, size = 20.sp, weight = FontWeight.SemiBold)
+            Column(verticalArrangement = Arrangement.spacedBy(Miel.spaceXs)) {
+                Text(title, color = Miel.ink, size = 20.sp, weight = FontWeight.SemiBold)
+                if (detail.isNotEmpty())
+                    Text(detail, color = Miel.muted, size = Miel.textSmall, lines = 1)
+            }
             content()
+        }
+    }
+}
+
+/** One action in More: a printed controller badge and a label, with the selection inset. */
+@Composable
+private fun MoreRow(key: String, label: String, chosen: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(14.dp)
+    Pressable(Modifier.fillMaxWidth().semantics { selected = chosen }, onClick) { pressed ->
+        val face by
+            animateColorAsState(
+                when {
+                    pressed -> Miel.pressed
+                    chosen -> Miel.selection
+                    else -> Miel.surface
+                },
+                tween(140, easing = Miel.easeOut),
+            )
+        Row(
+            Modifier.fillMaxWidth()
+                .heightIn(min = 56.dp)
+                .then(
+                    if (chosen || pressed) Modifier.relief(shape, face, inset = true) else Modifier,
+                )
+                .padding(horizontal = Miel.inset, vertical = Miel.spaceXs),
+            horizontalArrangement = Arrangement.spacedBy(Miel.inset),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ControllerBadge(key, Modifier.size(26.dp), face)
+            Text(
+                label,
+                color = Miel.ink,
+                size = Miel.textBody,
+                weight = FontWeight.SemiBold,
+                lines = 1,
+            )
         }
     }
 }
@@ -834,30 +955,71 @@ private fun Dialog(title: String, content: @Composable ColumnScope.() -> Unit) {
 @Composable
 private fun More(session: Session, command: (Command) -> Unit) {
     val confirm = session.confirm
-    val settings = session.settings
-    Dialog(if (confirm) "Begin again?" else session.game?.title.orEmpty()) {
+    val game = session.game
+    val detail =
+        listOf(
+                game?.platform.orEmpty(),
+                if ((game?.year ?: 0) > 0) "${game?.year}" else "",
+                game?.genre.orEmpty(),
+            )
+            .filter { it.isNotEmpty() }
+            .joinToString(" · ")
+    Dialog(if (confirm) "Begin again?" else game?.title.orEmpty(), if (confirm) "" else detail) {
         if (confirm) {
             Text(
                 "Replaces this session. In-game saves are kept.",
                 color = Miel.muted,
                 size = Miel.textBody,
             )
-        } else if (session.game?.core != null) {
-            Row(Modifier.fillMaxWidth()) {
-                Pill("Y", "Emulator settings", primary = false, fill = true) { command(Command.Y) }
-            }
-        }
-        if (!confirm && session.game?.let { it.deletable && it.rommId == 0 } == true) {
-            Row(Modifier.fillMaxWidth()) {
-                Pill("L", "Upload to RomM", primary = false, fill = true) {
-                    command(Command.UploadRom)
+        } else {
+            val rows =
+                session.moreActions.map {
+                    when (it) {
+                        Command.Y -> Triple("Y", "Emulator settings", it)
+                        Command.UploadRom -> Triple("L", "Upload to RomM", it)
+                        else -> Triple("A", "Start fresh", it)
+                    }
+                }
+            Column(
+                Modifier.fillMaxWidth()
+                    .relief(RoundedCornerShape(Miel.tileRadius), Miel.surface, height = .7f)
+                    .padding(Miel.spaceXs),
+            ) {
+                rows.forEachIndexed { i, (key, label, action) ->
+                    if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(Miel.line))
+                    MoreRow(key, label, i == session.moreRow) {
+                        session.moreRow = i
+                        command(action)
+                    }
                 }
             }
-        }
-        if (!confirm && session.game?.deletable == true) {
-            Row(Modifier.fillMaxWidth()) {
-                Pill("R", "Delete ROM", destructive = true, fill = true) {
-                    command(Command.DeleteRom)
+            if (game?.deletable == true) {
+                Pressable(
+                    Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(Miel.tileRadius))
+                        .background(Color(0xFFFBE8EB)),
+                    { command(Command.DeleteRom) },
+                ) { pressed ->
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .background(if (pressed) Color(0xFFF3D3DB) else Color.Transparent)
+                            .heightIn(min = 56.dp)
+                            .padding(
+                                horizontal = Miel.inset + Miel.spaceXs,
+                                vertical = Miel.spaceXs,
+                            ),
+                        horizontalArrangement = Arrangement.spacedBy(Miel.inset),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ControllerBadge("R", Modifier.size(26.dp), Color(0xFFFBE8EB))
+                        Text(
+                            "Delete ROM",
+                            color = Miel.rose,
+                            size = Miel.textBody,
+                            weight = FontWeight.SemiBold,
+                            lines = 1,
+                        )
+                    }
                 }
             }
         }
@@ -865,7 +1027,7 @@ private fun More(session: Session, command: (Command) -> Unit) {
             Pill("B", "Cancel", primary = false, fill = true) { command(Command.B) }
             Pill(
                 "A",
-                if (confirm) "Begin again" else "Start fresh",
+                if (confirm) "Begin again" else "Select",
                 destructive = confirm,
                 fill = true,
             ) {

@@ -208,6 +208,18 @@ class Session(private val path: File) {
     var confirm by mutableStateOf(false)
         private set
 
+    /** The selected row of [moreActions]. */
+    var moreRow by mutableStateOf(0)
+
+    /** More's actions, top to bottom; A runs the selected one. */
+    val moreActions: List<Command>
+        get() = buildList {
+            val game = game ?: return@buildList
+            if (game.core != null) add(Command.Y)
+            if (game.deletable && game.rommId == 0) add(Command.UploadRom)
+            add(Command.A)
+        }
+
     var error by mutableStateOf("")
 
     init {
@@ -422,7 +434,11 @@ class Session(private val path: File) {
             command == Command.X && game?.let(DroidDeck::isGame) != true -> {
                 menu = !menu
                 confirm = false
+                moreRow = 0
             }
+            inMore && (command == Command.Up || command == Command.Down) ->
+                moreRow =
+                    (moreRow + if (command == Command.Up) -1 else 1).coerceIn(moreActions.indices)
             inMore && command == Command.A -> confirm = true
             menu && command == Command.B -> closeMenu()
             command == Command.Suspend -> {

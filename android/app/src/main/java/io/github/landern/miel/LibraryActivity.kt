@@ -236,6 +236,14 @@ class LibraryActivity : ComponentActivity() {
         overlay?.let {
             return overlayCommand(it, command)
         }
+        if (session.menu && !session.confirm && command == Command.A) {
+            session.moreActions
+                .getOrNull(session.moreRow)
+                ?.takeIf { it != Command.A }
+                ?.let {
+                    return command(it)
+                }
+        }
         if (session.error == UNPLAYABLE) session.error = ""
         val command =
             if (command == Command.A && session.tab != Tab.APPS && session.games.isEmpty())
@@ -305,7 +313,15 @@ class LibraryActivity : ComponentActivity() {
         if (
             session.menu &&
                 !session.confirm &&
-                command !in listOf(Command.A, Command.B, Command.X, Command.Suspend)
+                command !in
+                    listOf(
+                        Command.A,
+                        Command.B,
+                        Command.X,
+                        Command.Suspend,
+                        Command.Up,
+                        Command.Down,
+                    )
         )
             return
         val before = Status(session)
