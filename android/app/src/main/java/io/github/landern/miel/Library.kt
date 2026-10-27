@@ -470,7 +470,7 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
             if (session.gameRows == 1)
                 { index ->
                     // Platform tabs name the platform already; the space stays so rows don't shift.
-                    if (session.tab == Tab.RECENT)
+                    if (session.tab == Tab.RECENT || session.tab == Tab.FAVORITES)
                         Text(
                             session.games[index].platform,
                             color = Miel.muted,
@@ -916,9 +916,9 @@ private fun Dialog(
     }
 }
 
-/** One action in More: a printed controller badge and a label, with the selection inset. */
+/** One action in More, with the selection inset. */
 @Composable
-private fun MoreRow(key: String, label: String, chosen: Boolean, onClick: () -> Unit) {
+private fun MoreRow(label: String, chosen: Boolean, destructive: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(14.dp)
     Pressable(Modifier.fillMaxWidth().semantics { selected = chosen }, onClick) { pressed ->
         val face by
@@ -933,17 +933,14 @@ private fun MoreRow(key: String, label: String, chosen: Boolean, onClick: () -> 
         Row(
             Modifier.fillMaxWidth()
                 .heightIn(min = 56.dp)
-                .then(
-                    if (chosen || pressed) Modifier.relief(shape, face, inset = true) else Modifier,
-                )
+                .relief(shape, face, height = .5f, inset = chosen || pressed)
                 .padding(horizontal = Miel.inset, vertical = Miel.spaceXs),
             horizontalArrangement = Arrangement.spacedBy(Miel.inset),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ControllerBadge(key, Modifier.size(26.dp), face)
             Text(
                 label,
-                color = Miel.ink,
+                color = if (destructive) Miel.rose else Miel.ink,
                 size = Miel.textBody,
                 weight = FontWeight.SemiBold,
                 lines = 1,
@@ -972,53 +969,26 @@ private fun More(session: Session, command: (Command) -> Unit) {
                 size = Miel.textBody,
             )
         } else {
-            val rows =
-                session.moreActions.map {
-                    when (it) {
-                        Command.Y -> Triple("Y", "Emulator settings", it)
-                        Command.UploadRom -> Triple("L", "Upload to RomM", it)
-                        else -> Triple("A", "Start fresh", it)
-                    }
-                }
             Column(
                 Modifier.fillMaxWidth()
-                    .relief(RoundedCornerShape(Miel.tileRadius), Miel.surface, height = .7f)
+                    .relief(RoundedCornerShape(Miel.tileRadius), Miel.background, inset = true)
                     .padding(Miel.spaceXs),
+                verticalArrangement = Arrangement.spacedBy(Miel.spaceXs),
             ) {
-                rows.forEachIndexed { i, (key, label, action) ->
-                    if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(Miel.line))
-                    MoreRow(key, label, i == session.moreRow) {
+                session.moreActions.forEachIndexed { i, action ->
+                    val label =
+                        when (action) {
+                            Command.Favorite ->
+                                if (session.favorite) "Remove from Favorites"
+                                else "Add to Favorites"
+                            Command.Y -> "Emulator settings"
+                            Command.UploadRom -> "Upload to RomM"
+                            Command.DeleteRom -> "Delete ROM"
+                            else -> "Start fresh"
+                        }
+                    MoreRow(label, i == session.moreRow, action == Command.DeleteRom) {
                         session.moreRow = i
                         command(action)
-                    }
-                }
-            }
-            if (game?.deletable == true) {
-                Pressable(
-                    Modifier.fillMaxWidth()
-                        .clip(RoundedCornerShape(Miel.tileRadius))
-                        .background(Color(0xFFFBE8EB)),
-                    { command(Command.DeleteRom) },
-                ) { pressed ->
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .background(if (pressed) Color(0xFFF3D3DB) else Color.Transparent)
-                            .heightIn(min = 56.dp)
-                            .padding(
-                                horizontal = Miel.inset + Miel.spaceXs,
-                                vertical = Miel.spaceXs,
-                            ),
-                        horizontalArrangement = Arrangement.spacedBy(Miel.inset),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        ControllerBadge("R", Modifier.size(26.dp), Color(0xFFFBE8EB))
-                        Text(
-                            "Delete ROM",
-                            color = Miel.rose,
-                            size = Miel.textBody,
-                            weight = FontWeight.SemiBold,
-                            lines = 1,
-                        )
                     }
                 }
             }

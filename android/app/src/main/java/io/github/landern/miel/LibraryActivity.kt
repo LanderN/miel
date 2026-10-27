@@ -235,6 +235,7 @@ class LibraryActivity : ComponentActivity() {
                     detail,
                     frame?.path ?: boxart.ifEmpty { artwork.heroPath(game.id) },
                     boxart = frame == null && boxart.isNotEmpty(),
+                    played = PlayTime.describe(this, game.id),
                 )
             } ?: Hero(if (session.games.isEmpty()) "No games" else "No recent games", "", "")
         }
@@ -327,6 +328,7 @@ class LibraryActivity : ComponentActivity() {
                         Command.A,
                         Command.B,
                         Command.X,
+                        Command.Favorite,
                         Command.Suspend,
                         Command.Up,
                         Command.Down,
@@ -355,6 +357,7 @@ class LibraryActivity : ComponentActivity() {
         val after = Status(session)
         return when {
             command == Command.Suspend -> null
+            command == Command.Favorite -> Cue.CONFIRM
             before.selected != after.selected || before.appSelected != after.appSelected ->
                 Cue.NAVIGATE
             !before.confirm && after.confirm -> Cue.CONFIRM
@@ -1058,6 +1061,7 @@ class LibraryActivity : ComponentActivity() {
                 .putExtra(CoreActivity.EXTRA_ROMM_LINK, romm.link(game.rommId, game.romFilename))
                 .putExtra(CoreActivity.EXTRA_ROMM_TOKEN, romm.token)
                 .putExtra(CoreActivity.EXTRA_TITLE, game.title)
+                .putExtra(CoreActivity.EXTRA_GAME_ID, game.id)
                 .putExtra(CoreActivity.EXTRA_ART, artwork.heroPath(game.id))
                 .putExtra(CoreActivity.EXTRA_FRAME, frame.path)
                 .putExtra(CoreActivity.EXTRA_FRESH, fresh)

@@ -49,6 +49,8 @@ constexpr uint64_t kFnvOffset = 1469598103934665603ull, kFnvPrime = 109951162821
 constexpr unsigned kMaxFrameSize = 4096;
 // Audio is held back after a start, pause or underrun until this much is queued.
 constexpr double kAudioPrefillSeconds = 0.05;
+// Fast-forward runs frames this many times as often, without sound.
+constexpr int kFastForward = 3;
 // Diagnostic sessions checkpoint this often; games only on Home, Back and pause, because
 // Azahar's serialize stalls emulation for most of a second.
 constexpr auto kDiagnosticCheckpoint = std::chrono::milliseconds(1500);
@@ -103,6 +105,7 @@ std::atomic<int> requestedDisc{-1}, requestedAnalog{-1};
 std::atomic<bool> analogEnabled{true};
 std::atomic<unsigned> discCount{0}, discIndex{0};
 std::atomic<bool> discFailed{false};
+std::atomic<bool> fastForward{false};
 
 // The session's state, reported to Java.
 std::atomic<bool> ready{false}, restored{false}, restoredBackup{false}, restoreBlocked{false},
@@ -410,6 +413,7 @@ void setupGraphics() {
 
 size_t audio(const int16_t* data, size_t count) {
     audioFrames += count;
+    if (fastForward) return count;
     size_t write = audioWrite.load(std::memory_order_relaxed);
     size_t space = audioRing.size() - (write - audioRead.load(std::memory_order_acquire));
     size_t samples = std::min(count * 2, space);
@@ -1146,7 +1150,7 @@ void loop(const Launch& launch, double fps) {
             checkpointDue = Clock::now() + interval;
         }
         // Pace without vsync; after a stall of over 100 ms, start counting again from now.
-        next += period;
+        next += fastForward ? period / kFastForward : period;
         if (next > Clock::now()) {
             uint64_t sleepStart = micros();
             std::this_thread::sleep_until(next);
@@ -1373,6 +1377,7 @@ extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_start(
     requestedDisc = requestedAnalog = -1;
     analogEnabled = true;
     discFailed = false;
+    fastForward = false;
     hw = {};
     frameTime = {};
     asyncAudio = {};
@@ -1397,6 +1402,11 @@ extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_surface(J
 extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_analog(JNIEnv*, jclass,
                                                                               jboolean enabled) {
     requestedAnalog = enabled ? 1 : 0;
+}
+
+extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_fastForward(JNIEnv*, jclass,
+                                                                                   jboolean on) {
+    fastForward = on;
 }
 
 extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_changeDisc(JNIEnv*, jclass,
@@ -1494,6 +1504,7 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_github_landern_miel_CoreHost_report
         .add("audioFrames", audioFrames.load())
         .add("inputEvents", inputEvents.load())
         .add("analogEnabled", analogEnabled.load())
+        .add("fastForward", fastForward.load())
         .add("analogPolls", analogPolls.load())
         .add("analogPeak", analogPeak.load())
         .add("rumbleRequests", rumbleRequests.load())

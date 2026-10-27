@@ -24,7 +24,10 @@ Demo library with homebrew artwork, captured in the emulator. [Game and artwork 
 - **A library for two screens.** Browse covers on the upper screen, with artwork and game details
   below. Choose a single row of portrait covers or two rows of square tiles.
 - **Continue where you stopped.** Returning to the library keeps your place. Recent puts the games
-  you last played within reach, without managing save-state slots.
+  you last played within reach, without managing save-state slots. Favorites keeps the ones you
+  pick, and each game shows its play time.
+- **The lower screen while you play.** Games on one screen show their art, play time, the time and
+  battery below, with fast-forward and a way back to the library.
 - **Local files or RomM.** Choose a ROM folder, connect your self-hosted [RomM](https://romm.app)
   library, or use both. RomM games download the first time you play; in-game saves sync before
   launch and upload when you return to the library. If both copies changed, choose which to keep.
@@ -87,6 +90,9 @@ for each game. **L1 + R1 + Select** toggles the DualShock’s Analog mode when a
 During play, touch the dimmed lower screen to brighten it; it dims again after eight seconds
 of inactivity.
 
+On systems that use one screen, the lower screen's **Fast-forward** switch runs the game at triple
+speed without sound, and **Library** saves your place and returns.
+
 PSP games run on the upper screen with 2× rendering resolution by default and left-stick controls.
 Keep ISO, CSO, PBP, CHD, ELF or PRX files in a `PSP` or `PlayStation Portable` folder;
 ZIP archives containing a game also work. PPSSPP's runtime assets are bundled; no BIOS is needed.
@@ -122,7 +128,8 @@ RomM save sync do not apply to these games.
 | **L / R** | Previous or next tab |
 | **Select** | Settings |
 
-The library has Recent, platform and Apps tabs. Platform tabs appear when they contain games.
+The library has Recent, Favorites, platform and Apps tabs. Favorites and platform tabs appear
+when they contain games. Add a game to Favorites from **X → More**.
 Drag the tiles horizontally to scroll. Tap a game to select it, then tap it again or press
 **Play** or **Continue** to launch it; tap an app to open it.
 

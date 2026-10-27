@@ -88,38 +88,33 @@ class SessionTest {
     }
 
     @Test
-    fun moreChangesAndPersistsCoreSettings() {
+    fun favoritesFormATabThatPersistsAndDisappearsWhenEmpty() {
         val s = open()
-        val changed = CoreSettings(resolution = 4, hardwareShaders = false)
-        s.run(Command.Right)
-        assertEquals(CoreSettings(), s.settings)
-        s.run(Command.X, Command.Right, Command.Y)
-        assertEquals(changed, s.settings)
-        s.run(Command.Right)
-        assertEquals("clamps at the ends", 4, s.settings.resolution)
-        s.run(Command.Resolution(2), Command.PreviousTab)
-        assertEquals(1, s.settings.resolution)
-        s.run(Command.Resolution(9))
-        assertEquals(1, s.settings.resolution)
-        s.run(Command.Resolution(4), Command.A, Command.Left, Command.Y)
-        assertEquals("confirmation ignores settings", changed, s.settings)
+        assertFalse(Tab.FAVORITES in s.tabs)
+        s.run(Command.Pick(2), Command.X)
+        assertEquals(Command.Favorite, s.moreActions.first())
+        s.run(Command.Favorite)
+        assertFalse("adding closes More", s.menu)
+        s.run(Command.Pick(0), Command.X, Command.Favorite)
+        assertEquals(listOf(Tab.RECENT, Tab.FAVORITES, Tab.N3DS, Tab.APPS), s.tabs)
 
-        val restored = open()
-        restored.run(Command.Right)
-        assertEquals(changed, restored.settings)
-        assertEquals("library input leaves settings alone", 1, restored.disk.settings.size)
-
-        restored.replaceGames(listOf(game(9, platform = "Game Boy Color")))
-        restored.run(Command.ChooseTab(Tab.GBC), Command.X, Command.Right, Command.Y)
-        assertEquals("only 3DS games have core settings", CoreSettings(), restored.settings)
+        val reopened = open()
+        reopened.run(Command.ChooseTab(Tab.FAVORITES))
+        assertEquals("library order", listOf(0, 2), reopened.order)
+        reopened.run(Command.X, Command.Favorite)
+        assertEquals(listOf(2), reopened.order)
+        assertEquals("the selection moves to a remaining favorite", 2, reopened.selected)
+        reopened.run(Command.X, Command.Favorite)
+        assertEquals("an emptied tab returns to Recent", Tab.RECENT, reopened.tab)
+        assertFalse(Tab.FAVORITES in reopened.tabs)
     }
 
     @Test
     fun failedWritesUndoTheChange() {
         File(dir, "blocker").writeText("blocked")
         val s = open(path = File(dir, "blocker/sessions-v1.json"))
-        s.run(Command.X, Command.Y)
-        assertEquals(CoreSettings(), s.settings)
+        s.run(Command.X, Command.Favorite)
+        assertTrue(s.disk.favorites.isEmpty())
         assertTrue(s.error.isNotEmpty())
         s.setGameRows(1)
         assertEquals("a failed write keeps the layout", 2, s.gameRows)
@@ -213,8 +208,7 @@ class SessionTest {
         s.replaceGames(listOf(game(9, "Game Boy"), game(3)))
         assertEquals("rom-3", s.game?.id)
         s.run(Command.X, Command.PreviousTab)
-        assertEquals("shoulders adjust More without switching tabs", Tab.N3DS, s.tab)
-        assertEquals(2, s.settings.resolution)
+        assertEquals("shoulders in More keep the tab", Tab.N3DS, s.tab)
     }
 
     @Test

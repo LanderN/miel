@@ -4,7 +4,11 @@ import android.animation.ObjectAnimator
 import android.animation.StateListAnimator
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
 import android.graphics.drawable.GradientDrawable
+import android.os.BatteryManager
+import android.os.SystemClock
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -12,19 +16,27 @@ import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Switch
+import android.widget.TextClock
 import android.widget.TextView
 import kotlin.math.roundToInt
 
-/** PlayStation controller and disc controls on the lower screen. */
+/**
+ * The lower screen during single-screen play: the game's art, title and play time, the time and
+ * battery, and fast-forward, Library, PlayStation controller and disc controls.
+ */
 class PlayControls(
     context: Context,
+    title: String?,
     private val opened: () -> Unit,
     private val dismissed: () -> Unit,
     private val insert: (Int) -> Unit,
     private val toggleAnalog: () -> Unit,
+    private val toggleFastForward: () -> Unit,
+    private val leave: () -> Unit,
 ) : FrameLayout(context) {
     private val cream = 0xfff5efe4.toInt()
     private val surface = 0xfffffaf1.toInt()
@@ -33,31 +45,25 @@ class PlayControls(
     private val honey = 0xffefb13a.toInt()
     private val ring = 0xffa8731c.toInt()
     private val line = 0xffded2bd.toInt()
+    private val paper = 0xfffbf7ef.toInt()
+    private val paperMuted = 0xccfbf7ef.toInt()
     private val regular = resources.getFont(R.font.nunito_regular)
     private val bold = resources.getFont(R.font.nunito_bold)
     private val dock = LinearLayout(context)
     private val current = label("", 14f)
     private val change = action("R3", "Change disc", true) { open() }
-    private var updatingAnalog = false
-    private val analog =
-        Switch(context).apply {
-            showText = false
-            thumbDrawable = background(surface, 14, line).apply { setSize(dp(28), dp(28)) }
-            trackDrawable = background(honey, 14).apply { setSize(dp(48), dp(28)) }
-            switchMinWidth = dp(48)
-            minHeight = dp(48)
-            contentDescription = "Analog controls"
-            thumbTintList = null
-            trackTintList =
-                ColorStateList(
-                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(honey, line),
-                )
-            setOnCheckedChangeListener { _, _ -> if (!updatingAnalog) toggleAnalog() }
-        }
+    private var updating = false
+    private val analog = switch("Analog controls", toggleAnalog)
+    private val fastForward = switch("Fast-forward", toggleFastForward)
+    private val art = ImageView(context)
+    private val played = label("", 14f)
+    private val battery = label("", 14f)
+    private var batteryAt = 0L
     private val discRow = LinearLayout(context)
     private val divider = View(context)
     private val analogRow = LinearLayout(context)
+    private val analogDivider = View(context)
+    private val fastForwardRow = LinearLayout(context)
     private val panel = LinearLayout(context)
     private val rows = LinearLayout(context)
     private val scroll = ScrollView(context)
@@ -70,6 +76,62 @@ class PlayControls(
 
     init {
         visibility = GONE
+        setBackgroundColor(0xff3f3024.toInt())
+        art.scaleType = ImageView.ScaleType.CENTER_CROP
+        addView(art, LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        addView(
+            View(context).apply {
+                background =
+                    GradientDrawable(
+                        GradientDrawable.Orientation.TOP_BOTTOM,
+                        intArrayOf(0xb33f3024.toInt(), 0xd93f3024.toInt(), 0xfa3f3024.toInt()),
+                    )
+            },
+            LayoutParams(MATCH_PARENT, MATCH_PARENT),
+        )
+        val bar = LinearLayout(context)
+        bar.gravity = Gravity.CENTER_VERTICAL
+        bar.setPadding(dp(24), dp(16), dp(16), 0)
+        val clock =
+            TextClock(context).apply {
+                format12Hour = "h:mm"
+                format24Hour = "HH:mm"
+                textSize = 16f
+                typeface = bold
+                setTextColor(paper)
+            }
+        bar.addView(clock)
+        battery.setTextColor(paperMuted)
+        bar.addView(
+            battery,
+            LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f).apply {
+                marginStart = dp(12)
+            },
+        )
+        bar.addView(action(null, "Library", false) { leave() })
+        addView(bar, LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.TOP))
+
+        val column = LinearLayout(context)
+        column.orientation = LinearLayout.VERTICAL
+        column.gravity = Gravity.CENTER_HORIZONTAL
+        column.clipChildren = false
+        val heading =
+            label(title.orEmpty(), 24f, true).apply {
+                setTextColor(paper)
+                gravity = Gravity.CENTER
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+                visibility = if (title.isNullOrEmpty()) GONE else VISIBLE
+            }
+        column.addView(heading, LinearLayout.LayoutParams(dp(420), WRAP_CONTENT))
+        played.setTextColor(0xfff5bc45.toInt())
+        column.addView(
+            played,
+            LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply {
+                topMargin = dp(4)
+                bottomMargin = dp(16)
+            },
+        )
         dock.orientation = LinearLayout.VERTICAL
         dock.setPadding(dp(16), dp(8), dp(16), dp(8))
         dock.background = background(surface, 26, line)
@@ -82,27 +144,15 @@ class PlayControls(
         discRow.addView(current, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
         discRow.addView(change)
         dock.addView(discRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
-        divider.setBackgroundColor(line)
-        dock.addView(
-            divider,
-            LinearLayout.LayoutParams(MATCH_PARENT, dp(1)).apply {
-                topMargin = dp(12)
-                bottomMargin = dp(12)
-            },
-        )
-        analogRow.gravity = Gravity.CENTER_VERTICAL
-        analogRow.setOnClickListener { analog.toggle() }
-        analogRow.addView(
-            label("Analog controls", 16f, true),
-            LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f),
-        )
-        analogRow.addView(analog)
-        dock.addView(analogRow, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+        addDivider(divider)
+        switchRow(analogRow, "Analog controls", analog)
+        addDivider(analogDivider)
+        switchRow(fastForwardRow, "Fast-forward", fastForward)
+        column.addView(dock, LinearLayout.LayoutParams(dp(340), WRAP_CONTENT))
         addView(
-            dock,
-            LayoutParams(dp(340), WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
-                bottomMargin = dp(24)
-            },
+            column,
+            LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL)
+                .apply { bottomMargin = dp(24) },
         )
 
         panel.orientation = LinearLayout.VERTICAL
@@ -126,6 +176,9 @@ class PlayControls(
         addView(panel, LayoutParams(MATCH_PARENT, MATCH_PARENT))
     }
 
+    fun art(bitmap: Bitmap) = art.setImageBitmap(bitmap)
+
+    /** `played` is the game's total play time in milliseconds. */
     fun update(
         count: Int,
         index: Int,
@@ -133,17 +186,32 @@ class PlayControls(
         failed: Boolean,
         showAnalog: Boolean,
         analogEnabled: Boolean,
+        fastForwarding: Boolean,
+        played: Long,
     ) {
         this.count = count
         this.index = index
-        visibility = if (ready && (count > 1 || showAnalog)) VISIBLE else GONE
+        visibility = if (ready) VISIBLE else GONE
         discRow.visibility = if (count > 1) VISIBLE else GONE
         divider.visibility = if (count > 1 && showAnalog) VISIBLE else GONE
         analogRow.visibility = if (showAnalog) VISIBLE else GONE
-        updatingAnalog = true
+        analogDivider.visibility = if (count > 1 || showAnalog) VISIBLE else GONE
+        updating = true
         analog.isChecked = analogEnabled
-        updatingAnalog = false
+        fastForward.isChecked = fastForwarding
+        updating = false
         current.text = if (failed) "Couldn’t change disc · Retry" else "Disc ${index + 1} of $count"
+        val playedText = "${PlayTime.duration(played)} played"
+        if (this.played.text.toString() != playedText) this.played.text = playedText
+        val now = SystemClock.uptimeMillis()
+        if (batteryAt == 0L || now - batteryAt > 30_000) {
+            batteryAt = now
+            val level =
+                context
+                    .getSystemService(BatteryManager::class.java)
+                    ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
+            battery.text = if (level in 0..100) "$level%" else ""
+        }
     }
 
     fun open() {
@@ -229,7 +297,44 @@ class PlayControls(
         }
     }
 
-    private fun action(key: String, text: String, primary: Boolean, clicked: () -> Unit): View =
+    private fun switch(description: String, toggled: () -> Unit) =
+        Switch(context).apply {
+            showText = false
+            thumbDrawable = background(surface, 14, line).apply { setSize(dp(28), dp(28)) }
+            trackDrawable = background(honey, 14).apply { setSize(dp(48), dp(28)) }
+            switchMinWidth = dp(48)
+            minHeight = dp(48)
+            contentDescription = description
+            thumbTintList = null
+            trackTintList =
+                ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(honey, line),
+                )
+            setOnCheckedChangeListener { _, _ -> if (!updating) toggled() }
+        }
+
+    private fun switchRow(row: LinearLayout, text: String, switch: Switch) {
+        row.gravity = Gravity.CENTER_VERTICAL
+        row.setOnClickListener { switch.toggle() }
+        row.addView(label(text, 16f, true), LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+        row.addView(switch)
+        dock.addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
+    }
+
+    private fun addDivider(view: View) {
+        view.setBackgroundColor(line)
+        dock.addView(
+            view,
+            LinearLayout.LayoutParams(MATCH_PARENT, dp(1)).apply {
+                topMargin = dp(12)
+                bottomMargin = dp(12)
+            },
+        )
+    }
+
+    /** A pill with a controller badge for `key`, or without one when it is null. */
+    private fun action(key: String?, text: String, primary: Boolean, clicked: () -> Unit): View =
         LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(16), dp(10), dp(20), dp(10))
@@ -243,6 +348,11 @@ class PlayControls(
             relief(this)
             contentDescription = text
             setOnClickListener { clicked() }
+            if (key == null) {
+                setPadding(dp(20), dp(10), dp(20), dp(10))
+                addView(label(text, 14f, true))
+                return@apply
+            }
             val badge =
                 label(key, 12f, true).apply {
                     gravity = Gravity.CENTER

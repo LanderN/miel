@@ -8,6 +8,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.nio.channels.FileChannel
 import java.nio.file.StandardOpenOption
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** The screen an app opens on. */
@@ -21,6 +22,7 @@ enum class Screen(val label: String) {
 /** Library tabs, in shoulder-button order. */
 enum class Tab(val label: String, val platform: String? = null) {
     RECENT("Recent"),
+    FAVORITES("Favorites"),
     N3DS("3DS", "Nintendo 3DS"),
     NDS("NDS", "Nintendo DS"),
     GBA("GBA", "Game Boy Advance"),
@@ -51,10 +53,10 @@ sealed interface Command {
 
     object Down : Command
 
-    /** L: the previous tab; in More, a lower resolution. */
+    /** L: the previous tab; in More, Upload to RomM. */
     object PreviousTab : Command
 
-    /** R: the next tab; in More, a higher resolution. */
+    /** R: the next tab; in More, Delete ROM. */
     object NextTab : Command
 
     object A : Command
@@ -69,6 +71,9 @@ sealed interface Command {
     object UploadRom : Command
 
     object DeleteRom : Command
+
+    /** Adds the selected game to Favorites, or removes it. */
+    object Favorite : Command
 
     /** A library tab was touched. */
     data class ChooseTab(val tab: Tab) : Command
@@ -85,17 +90,12 @@ sealed interface Command {
     /** A settings category was touched; selects its first row without activating it. */
     data class FocusSetting(val index: Int) : Command
 
-    /** A resolution segment in More was touched. */
-    data class Resolution(val value: Int) : Command
-
     /** The library lost the foreground. */
     object Suspend : Command
 }
 
-/** Azahar options for one game, changed in More. */
+/** Azahar options for one game, from sessions that predate per-game emulator settings. */
 data class CoreSettings(val resolution: Int = 3, val hardwareShaders: Boolean = true)
-
-val RESOLUTIONS = 1..4
 
 /** The persisted part of the session, keyed by game ID and app ID. */
 data class Disk(
@@ -106,6 +106,7 @@ data class Disk(
     val gameRows: Int = 2,
     val coreOptions: Map<String, Map<String, String>> = emptyMap(),
     val gameOptions: Map<String, Map<String, String>> = emptyMap(),
+    val favorites: Set<String> = emptySet(),
 ) {
     fun toJson(): String =
         JSONObject()
@@ -128,6 +129,7 @@ data class Disk(
             .put("core_options", JSONObject(coreOptions.mapValues { JSONObject(it.value) }))
             .put("game_options", JSONObject(gameOptions.mapValues { JSONObject(it.value) }))
             .put("game_rows", gameRows)
+            .put("favorites", JSONArray(favorites.sorted()))
             .toString()
 
     companion object {
@@ -164,6 +166,10 @@ data class Disk(
                                 getJSONObject(it).entries { getString(it) }
                             },
                         gameRows = json.optInt("game_rows", 2).takeIf { it in 1..2 } ?: 2,
+                        favorites =
+                            json.optJSONArray("favorites")?.let { list ->
+                                (0 until list.length()).map(list::getString).toSet()
+                            } ?: emptySet(),
                     )
             } catch (error: Exception) {
                 null
@@ -215,10 +221,15 @@ class Session(private val path: File) {
     val moreActions: List<Command>
         get() = buildList {
             val game = game ?: return@buildList
+            add(Command.Favorite)
             if (game.core != null) add(Command.Y)
             if (game.deletable && game.rommId == 0) add(Command.UploadRom)
             add(Command.A)
+            if (game.deletable) add(Command.DeleteRom)
         }
+
+    val favorite: Boolean
+        get() = game?.id in disk.favorites
 
     var error by mutableStateOf("")
 
@@ -230,11 +241,15 @@ class Session(private val path: File) {
         disk = primary ?: read(backup(path)) ?: Disk()
     }
 
-    /** Recent and Apps stay visible; platform tabs need at least one ROM. */
+    /** Recent and Apps stay visible; Favorites and platform tabs need at least one game. */
     val tabs: List<Tab>
         get() =
             Tab.entries.filter { tab ->
-                tab.platform == null || games.any { it.platform == tab.platform }
+                when {
+                    tab == Tab.FAVORITES -> games.any { it.id in disk.favorites }
+                    tab.platform == null -> true
+                    else -> games.any { it.platform == tab.platform }
+                }
             }
 
     /** Indices into the full library for the active tab. */
@@ -246,6 +261,7 @@ class Session(private val path: File) {
                         .filter { games[it].id in disk.recent }
                         .sortedByDescending { disk.recent[games[it].id] }
                         .take(10)
+                Tab.FAVORITES -> games.indices.filter { games[it].id in disk.favorites }
                 Tab.APPS -> emptyList()
                 else -> games.indices.filter { games[it].platform == tab.platform }
             }
@@ -411,25 +427,12 @@ class Session(private val path: File) {
         }
         if (order.isEmpty()) return
         val inMore = menu && !confirm
-        val adjusting = inMore && game?.core == Core.AZAHAR
         when {
             !menu && command in MOVES -> {
                 val order = order
                 selected = order[moved(position, order.size, gameRows, command)]
             }
-            adjusting && command in STEPS ->
-                changeSettings {
-                    val step =
-                        if (command == Command.Left || command == Command.PreviousTab) -1 else 1
-                    it.copy(
-                        resolution =
-                            (it.resolution + step).coerceIn(RESOLUTIONS.first, RESOLUTIONS.last),
-                    )
-                }
-            adjusting && command is Command.Resolution && command.value in RESOLUTIONS ->
-                changeSettings { it.copy(resolution = command.value) }
-            adjusting && command == Command.Y ->
-                changeSettings { it.copy(hardwareShaders = !it.hardwareShaders) }
+            inMore && command == Command.Favorite -> toggleFavorite()
             !menu && command is Command.Pick && command.index in order -> selected = command.index
             command == Command.X && game?.let(DroidDeck::isGame) != true -> {
                 menu = !menu
@@ -459,18 +462,20 @@ class Session(private val path: File) {
             false
         }
 
-    /** Applies `change` to the selected game's settings, undone if they cannot be saved. */
-    private fun changeSettings(change: (CoreSettings) -> CoreSettings) {
+    /**
+     * Adds the selected game to Favorites or removes it, closing More. Leaving an emptied Favorites
+     * tab returns to Recent.
+     */
+    private fun toggleFavorite() {
         val id = game?.id ?: return
-        val settings = change(settings)
         changeDisk {
             it.copy(
-                settings = it.settings + (id to settings),
-                gameOptions =
-                    it.gameOptions +
-                        (id to (it.gameOptions[id].orEmpty() - settings.options().keys)),
+                favorites = if (id in it.favorites) it.favorites - id else it.favorites + id,
             )
         }
+        closeMenu()
+        if (tab !in tabs) chooseTab(Tab.RECENT)
+        else if (selected !in order) selected = order.firstOrNull() ?: 0
     }
 
     /** Applies `change` to the persisted state, undone if it cannot be saved. */
@@ -486,7 +491,6 @@ class Session(private val path: File) {
     }
 
     private companion object {
-        val STEPS = setOf(Command.Left, Command.Right, Command.PreviousTab, Command.NextTab)
         val MOVES = setOf(Command.Left, Command.Right, Command.Up, Command.Down)
 
         fun backup(path: File) = File(path.path.removeSuffix(".json") + ".bak")

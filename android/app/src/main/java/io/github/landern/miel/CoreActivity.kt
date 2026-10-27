@@ -83,7 +83,14 @@ class CoreActivity : Activity() {
     private var discCount = 0
     private var discIndex = 0
     private var analogEnabled = true
+    private var fastForward = false
     private lateinit var upper: SurfaceView
+
+    /** Play time already in PlayTime, and play since then, counted while the game runs. */
+    private var gameId = ""
+    private var played = 0L
+    private var unsavedPlay = 0L
+    private var lastPoll = 0L
 
     /** The upper screen as a save was requested, kept once the host reports the checkpoint. */
     private var frame: Bitmap? = null
@@ -109,6 +116,8 @@ class CoreActivity : Activity() {
                 .getBoolean(intent.getStringExtra(EXTRA_ROM_URI).orEmpty(), true)
         debugReports = debuggable && intent.getBooleanExtra(EXTRA_DEBUG_REPORTS, false)
         framePath = intent.getStringExtra(EXTRA_FRAME).orEmpty()
+        if (!diagnostic && !probe) gameId = intent.getStringExtra(EXTRA_GAME_ID).orEmpty()
+        played = PlayTime.played(this, gameId)
 
         @Suppress("DEPRECATION")
         window.addFlags(
@@ -145,6 +154,7 @@ class CoreActivity : Activity() {
         playControls =
             PlayControls(
                 this,
+                intent.getStringExtra(EXTRA_TITLE),
                 opened = {
                     wakeLower()
                     CoreHost.pause(true)
@@ -163,6 +173,12 @@ class CoreActivity : Activity() {
                     wakeLower()
                     CoreHost.analog(analogEnabled)
                 },
+                toggleFastForward = {
+                    fastForward = !fastForward
+                    wakeLower()
+                    CoreHost.fastForward(fastForward)
+                },
+                leave = ::returnToLibrary,
             )
         lowerRoot.addView(playControls, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         lowerDimmer =
@@ -272,7 +288,12 @@ class CoreActivity : Activity() {
         val size = maxOf(metrics.widthPixels, metrics.heightPixels)
         staging.execute {
             val bitmap = HeroView.decode(path, size, size) ?: return@execute
-            main.post { if (!destroyed) overlay.art(bitmap) }
+            main.post {
+                if (!destroyed) {
+                    overlay.art(bitmap)
+                    playControls.art(bitmap)
+                }
+            }
         }
     }
 
@@ -478,6 +499,16 @@ class CoreActivity : Activity() {
     /** Updates the screens and dialogs for `info`. Returns true once the activity finishes. */
     private fun react(info: JSONObject): Boolean {
         val running = info.optBoolean("running")
+        val now = SystemClock.elapsedRealtime()
+        if (
+            lastPoll > 0 &&
+                running &&
+                info.optBoolean("ready") &&
+                !info.optBoolean("paused") &&
+                !closing
+        )
+            unsavedPlay += (now - lastPoll).coerceAtMost(1_000)
+        lastPoll = now
         showStatus(info)
         dimLower(
             !diagnostic &&
@@ -495,10 +526,12 @@ class CoreActivity : Activity() {
         playControls.update(
             discCount,
             discIndex,
-            info.optBoolean("ready") && !closing,
+            info.optBoolean("ready") && !closing && !core.dual && !diagnostic,
             info.optBoolean("discFailed"),
             core == Core.PCSX && !diagnostic,
             analogEnabled,
+            fastForward,
+            played + unsavedPlay,
         )
         val checkpoints = info.optInt("checkpoints")
         if (checkpoints > this.checkpoints) {
@@ -664,6 +697,9 @@ class CoreActivity : Activity() {
      * screen's height, while the surface exists.
      */
     private fun save(exit: Boolean) {
+        PlayTime.add(this, gameId, unsavedPlay)
+        played += unsavedPlay
+        unsavedPlay = 0
         if (framePath.isNotEmpty() && upper.holder.surface.isValid) {
             val height = lowerRoot.height.takeIf { it in 1 until upper.height } ?: upper.height
             val bitmap =
@@ -835,6 +871,9 @@ class CoreActivity : Activity() {
         const val EXTRA_FILENAME = "filename"
         const val EXTRA_ROM_DIRECTORY = "romDirectory"
         const val EXTRA_TITLE = "title"
+
+        /** The game's library ID, which keys its PlayTime. */
+        const val EXTRA_GAME_ID = "gameId"
         const val EXTRA_ART = "art"
 
         /** Where the upper screen at each checkpoint goes; see ArtworkCache.frame. */

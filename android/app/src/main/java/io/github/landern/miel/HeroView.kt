@@ -32,6 +32,8 @@ data class Hero(
     val settings: SettingsDetail? = null,
     /** Fills the screen with front box art, without a text overlay. */
     val boxart: Boolean = false,
+    /** Play time and last played, below `detail`; see PlayTime.describe. */
+    val played: String = "",
 )
 
 /**
@@ -377,11 +379,17 @@ class HeroView(context: Context) : View(context) {
         if (alpha <= 0) return
         val x = 24 * scale
         val opacity = (255 * alpha).toInt()
-        val detailY = height - 24 * scale
+        var detailY = height - 24 * scale
         paint.typeface = detailFace
+        paint.textSize = 14 * scale
+        if (hero.played.isNotEmpty()) {
+            paint.color = 0xfff5bc45.toInt()
+            paint.alpha = opacity
+            canvas.drawText(hero.played, x, detailY, paint)
+            detailY -= paint.fontSpacing
+        }
         paint.color = 0xffe5d6bc.toInt()
         paint.alpha = opacity
-        paint.textSize = 14 * scale
         val detail =
             TextUtils.ellipsize(hero.detail, paint, width - 2 * x, TextUtils.TruncateAt.END)
                 .toString()
