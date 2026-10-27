@@ -8,7 +8,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.text.Layout
@@ -43,7 +42,6 @@ class HeroView(context: Context) : View(context) {
     private val artPaint = Paint(Paint.FILTER_BITMAP_FLAG)
     private val shade = Paint()
     private val bounds = RectF()
-    private val textBounds = Rect()
     private val titleFace = context.resources.getFont(R.font.nunito_extrabold)
     private val detailFace = context.resources.getFont(R.font.nunito_regular)
     private val cache = LruCache<String, Bitmap>(4)
@@ -258,12 +256,12 @@ class HeroView(context: Context) : View(context) {
             TextUtils.ellipsize(hero.detail, paint, width - 2 * x, TextUtils.TruncateAt.END)
                 .toString()
         canvas.drawText(detail, x, detailY, paint)
-        paint.getTextBounds(detail, 0, detail.length, textBounds)
-        val titleBottom = detailY + textBounds.top - 8 * scale
+        val titleBottom = detailY + paint.fontMetrics.ascent - 8 * scale
         paint.typeface = titleFace
         paint.color = 0xfffdfaf3.toInt()
         paint.alpha = opacity
         paint.textSize = 32 * scale
+        val titleBaseline = titleBottom - paint.fontMetrics.descent
         val title =
             StaticLayout.Builder.obtain(
                     hero.title,
@@ -278,11 +276,8 @@ class HeroView(context: Context) : View(context) {
                 .setEllipsize(TextUtils.TruncateAt.END)
                 .build()
         val lastLine = title.lineCount - 1
-        val lastText =
-            hero.title.substring(title.getLineStart(lastLine), title.getLineEnd(lastLine))
-        paint.getTextBounds(lastText, 0, lastText.length, textBounds)
         canvas.save()
-        canvas.translate(x, titleBottom - title.getLineBaseline(lastLine) - textBounds.bottom)
+        canvas.translate(x, titleBaseline - title.getLineBaseline(lastLine))
         title.draw(canvas)
         canvas.restore()
     }
