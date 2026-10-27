@@ -377,7 +377,7 @@ private fun ColumnScope.TileGrid(
                 (columns + if (paged) 0.3f else 0f)
         val density = LocalDensity.current
         val fontScale = density.fontScale.coerceAtLeast(1f)
-        val aboveHeight = if (above != null) 24.dp * fontScale else 0.dp
+        val aboveHeight = if (above != null) 24.dp * fontScale + 8.dp else 0.dp
         val belowHeight = if (below != null) 72.dp * fontScale else 0.dp
         val availableHeight = (maxHeight - aboveHeight - belowHeight).coerceAtLeast(1.dp)
         val rowHeight = (availableHeight - gap * (rows - 1)) / rows
