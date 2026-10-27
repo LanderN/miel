@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.app.Presentation
 import android.content.Intent
 import android.content.pm.ApplicationInfo
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.media.AudioManager
 import android.net.Uri
@@ -20,6 +21,7 @@ import android.view.Gravity
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.PixelCopy
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.View
@@ -71,6 +73,7 @@ class CoreActivity : Activity() {
     @Volatile private var stagingStatus = "Preparing your game…"
     private var statePath = ""
     private var savePath = ""
+    private var framePath = ""
     private var lastStatus = ""
     private lateinit var playControls: PlayControls
     private lateinit var lowerDimmer: View
@@ -80,6 +83,11 @@ class CoreActivity : Activity() {
     private var discCount = 0
     private var discIndex = 0
     private var analogEnabled = true
+    private lateinit var upper: SurfaceView
+
+    /** The upper screen as a save was requested, kept once the host reports the checkpoint. */
+    private var frame: Bitmap? = null
+    private var checkpoints = 0
 
     /** The game's core; the diagnostic test core renders Azahar's layout. */
     private var core = Core.AZAHAR
@@ -100,6 +108,7 @@ class CoreActivity : Activity() {
             getSharedPreferences("controllers", MODE_PRIVATE)
                 .getBoolean(intent.getStringExtra(EXTRA_ROM_URI).orEmpty(), true)
         debugReports = debuggable && intent.getBooleanExtra(EXTRA_DEBUG_REPORTS, false)
+        framePath = intent.getStringExtra(EXTRA_FRAME).orEmpty()
 
         @Suppress("DEPRECATION")
         window.addFlags(
@@ -165,7 +174,8 @@ class CoreActivity : Activity() {
         lowerRoot.addView(lowerDimmer, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         val content = FrameLayout(this)
         content.setBackgroundColor(Color.BLACK)
-        content.addView(screen(1), FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        upper = screen(1)
+        content.addView(upper, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         setContentView(content)
         displayListener.register()
         attachLower()
@@ -490,6 +500,12 @@ class CoreActivity : Activity() {
             core == Core.PCSX && !diagnostic,
             analogEnabled,
         )
+        val checkpoints = info.optInt("checkpoints")
+        if (checkpoints > this.checkpoints) {
+            this.checkpoints = checkpoints
+            frame?.let(::keepFrame)
+            frame = null
+        }
         if (info.optBoolean("checkpointFailed")) {
             if (running && !saveFailureShown) showSaveFailure()
         } else {
@@ -574,7 +590,7 @@ class CoreActivity : Activity() {
                     returnToLibrary()
                 } else {
                     resumeAfterSave = true
-                    CoreHost.save(false)
+                    save(false)
                 }
             }
             .setNegativeButton("Keep playing") { _, _ ->
@@ -629,7 +645,7 @@ class CoreActivity : Activity() {
         if (probe || closing || destroyed || owner !== this) return
         if (started) {
             CoreHost.pause(true)
-            CoreHost.save(false)
+            save(false)
         }
         // Power state can lag the pause callback during lid close, so the checkpoint starts now
         // and the decision between sleep and leaving waits.
@@ -643,6 +659,42 @@ class CoreActivity : Activity() {
             CoreHost.pause(false)
     }
 
+    /**
+     * Requests a checkpoint of the paused game, copying its upper screen, at most the lower
+     * screen's height, while the surface exists.
+     */
+    private fun save(exit: Boolean) {
+        if (framePath.isNotEmpty() && upper.holder.surface.isValid) {
+            val height = lowerRoot.height.takeIf { it in 1 until upper.height } ?: upper.height
+            val bitmap =
+                Bitmap.createBitmap(
+                    upper.width * height / upper.height,
+                    height,
+                    Bitmap.Config.ARGB_8888,
+                )
+            PixelCopy.request(
+                upper,
+                bitmap,
+                { if (it == PixelCopy.SUCCESS) frame = bitmap },
+                main,
+            )
+        }
+        CoreHost.save(exit)
+    }
+
+    /** Writes `frame` to EXTRA_FRAME, replacing the previous checkpoint's. */
+    private fun keepFrame(frame: Bitmap) {
+        val file = AtomicFile(File(framePath))
+        var output: FileOutputStream? = null
+        try {
+            output = file.startWrite()
+            frame.compress(Bitmap.CompressFormat.JPEG, 85, output)
+            file.finishWrite(output)
+        } catch (error: IOException) {
+            if (output != null) file.failWrite(output)
+        }
+    }
+
     /** Checkpoints and exits the core; the report loop finishes once it is written. */
     private fun returnToLibrary() {
         if (closing || destroyed || owner !== this) return
@@ -653,7 +705,7 @@ class CoreActivity : Activity() {
             return
         }
         CoreHost.pause(true)
-        CoreHost.save(true)
+        save(true)
         status.text = KEEPING
         overlay.update(KEEPING, LoadingOverlay.PULSE)
     }
@@ -784,6 +836,9 @@ class CoreActivity : Activity() {
         const val EXTRA_ROM_DIRECTORY = "romDirectory"
         const val EXTRA_TITLE = "title"
         const val EXTRA_ART = "art"
+
+        /** Where the upper screen at each checkpoint goes; see ArtworkCache.frame. */
+        const val EXTRA_FRAME = "frame"
         const val EXTRA_FRESH = "fresh"
         const val EXTRA_OPTIONS = "coreOptions"
         const val EXTRA_RESOLUTION = "resolution"

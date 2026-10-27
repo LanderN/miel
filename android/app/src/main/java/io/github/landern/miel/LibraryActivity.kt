@@ -216,6 +216,7 @@ class LibraryActivity : ComponentActivity() {
             } ?: Hero("No apps", "", "")
         } else {
             session.game?.let { game ->
+                val frame = artwork.frame(game)?.takeIf { it.isFile }
                 val boxart = artwork.boxartPath(game)
                 val detail =
                     listOf(game.platform, if (game.year > 0) "${game.year}" else "", game.genre)
@@ -224,8 +225,8 @@ class LibraryActivity : ComponentActivity() {
                 Hero(
                     game.title,
                     detail,
-                    boxart.ifEmpty { artwork.heroPath(game.id) },
-                    boxart = boxart.isNotEmpty(),
+                    frame?.path ?: boxart.ifEmpty { artwork.heroPath(game.id) },
+                    boxart = frame == null && boxart.isNotEmpty(),
                 )
             } ?: Hero(if (session.games.isEmpty()) "No games" else "No recent games", "", "")
         }
@@ -1036,6 +1037,8 @@ class LibraryActivity : ComponentActivity() {
             sounds.play(Cue.OPEN)
             return
         }
+        val frame = requireNotNull(artwork.frame(game))
+        if (fresh) frame.delete()
         val intent =
             Intent(this, CoreActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1048,6 +1051,7 @@ class LibraryActivity : ComponentActivity() {
                 .putExtra(CoreActivity.EXTRA_ROMM_TOKEN, romm.token)
                 .putExtra(CoreActivity.EXTRA_TITLE, game.title)
                 .putExtra(CoreActivity.EXTRA_ART, artwork.heroPath(game.id))
+                .putExtra(CoreActivity.EXTRA_FRAME, frame.path)
                 .putExtra(CoreActivity.EXTRA_FRESH, fresh)
                 .putExtra(CoreActivity.EXTRA_OPTIONS, session.launchOptions(core))
                 .putExtra(

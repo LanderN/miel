@@ -49,6 +49,10 @@ class ArtworkCache(
         paths["$FRONT_BOXART:${game.id}"]
             ?: if (game.rommId == 0) coverPath(game.id) else ""
 
+    /** CoreActivity's JPEG of `game`'s upper screen at its last checkpoint, per core version. */
+    fun frame(game: Game): File? =
+        game.core?.let { File(context.filesDir, "frames/${it.version}/${game.id}.jpg") }
+
     fun close() {
         closed = true
         notifications.cancel()
