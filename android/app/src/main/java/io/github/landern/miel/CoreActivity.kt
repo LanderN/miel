@@ -743,13 +743,17 @@ class CoreActivity : Activity() {
             return super.onGenericMotionEvent(event)
         }
         rumble.select(event.device)
+        val stickX = event.getAxisValue(MotionEvent.AXIS_X)
+        val stickY = event.getAxisValue(MotionEvent.AXIS_Y)
+        val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
+        val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
         CoreHost.axes(
-            event.getAxisValue(MotionEvent.AXIS_X),
-            event.getAxisValue(MotionEvent.AXIS_Y),
+            stickX,
+            stickY,
             event.getAxisValue(MotionEvent.AXIS_Z),
             event.getAxisValue(MotionEvent.AXIS_RZ),
-            event.getAxisValue(MotionEvent.AXIS_HAT_X),
-            event.getAxisValue(MotionEvent.AXIS_HAT_Y),
+            if (core.stickDrivesDpad && hatX == 0f) stickX else hatX,
+            if (core.stickDrivesDpad && hatY == 0f) stickY else hatY,
             maxOf(
                 event.getAxisValue(MotionEvent.AXIS_LTRIGGER),
                 event.getAxisValue(MotionEvent.AXIS_BRAKE),

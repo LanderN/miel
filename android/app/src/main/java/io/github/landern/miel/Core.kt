@@ -82,6 +82,10 @@ enum class Core(
         lowerInset = 0f,
     );
 
+    /** Whether the left stick also drives the d-pad, for systems without an analog stick. */
+    val stickDrivesDpad: Boolean
+        get() = this == MELONDS || this == MGBA || this == FCEUMM || this == BSNES
+
     fun accepts(filename: String): Boolean =
         filename.substringAfterLast('.', "").lowercase().let { it in extensions || it == "zip" }
 
