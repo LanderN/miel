@@ -3,6 +3,7 @@ package io.github.landern.miel
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.text.Normalizer
+import java.util.regex.Pattern
 
 /**
  * Libretro's thumbnail naming: directory listings per system and kind, and exact title matching
@@ -11,7 +12,7 @@ import java.text.Normalizer
 object LibretroArt {
     const val BOXARTS = "Named_Boxarts"
     const val SNAPS = "Named_Snaps"
-    private val LINK = Regex("href=\"([^\"]+)\"", RegexOption.IGNORE_CASE)
+    private val LINK = Pattern.compile("href=\"([^\"]+)\"", Pattern.CASE_INSENSITIVE)
     private val MARKS = Regex("\\p{M}")
     private val PNG = Regex("\\.png$")
     private val TAGS =
@@ -37,18 +38,21 @@ object LibretroArt {
         URLEncoder.encode(value, "UTF-8").replace("+", "%20")
 
     /** The PNG files a directory listing links to. */
-    fun filenames(html: String): List<String> =
-        LINK.findAll(html)
-            .mapNotNull { link ->
-                try {
-                    // Listings contain literal + signs as well as encoded spaces.
-                    URLDecoder.decode(link.groupValues[1].replace("+", "%2B"), "UTF-8")
-                } catch (malformed: IllegalArgumentException) {
-                    null
-                }
+    fun filenames(html: String): List<String> {
+        val links = LINK.matcher(html)
+        return buildList {
+            while (links.find()) {
+                val file =
+                    try {
+                        // Listings contain literal + signs as well as encoded spaces.
+                        URLDecoder.decode(links.group(1)!!.replace("+", "%2B"), "UTF-8")
+                    } catch (malformed: IllegalArgumentException) {
+                        continue
+                    }
+                if (file.endsWith(".png") && '/' !in file && '\\' !in file) add(file)
             }
-            .filter { it.endsWith(".png") && '/' !in it && '\\' !in it }
-            .toList()
+        }
+    }
 
     /**
      * A title or file name reduced to lowercase letters and digits, without accents, region and

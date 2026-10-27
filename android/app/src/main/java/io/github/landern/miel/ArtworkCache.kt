@@ -401,13 +401,14 @@ class ArtworkCache(
                             LIBRETRO_TIMEOUT,
                         ),
                     )
-                if (LibretroArt.filenames(html).isEmpty()) {
+                val names = LibretroArt.filenames(html)
+                if (names.isEmpty()) {
                     throw IOException("Empty thumbnail listing")
                 }
                 val temporary = File(directory, "$prefix.tmp")
                 temporary.writeText(html)
                 Files.move(temporary.toPath(), index.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                return LibretroArt.filenames(html)
+                return names
             } catch (error: IOException) {
                 if (index.exists()) return LibretroArt.filenames(index.readText())
                 throw error

@@ -11,8 +11,8 @@ class LibretroArtTest {
     fun listingsDecodeLinksAndKeepLiteralPlus() {
         val html =
             "<a href=\"A+B%20(Europe).png\">cover</a><a href=\"../bad.png\">bad</a>" +
-                "<a href=\"%ZZ.png\">bad</a>"
-        assertEquals(listOf("A+B (Europe).png"), LibretroArt.filenames(html))
+                "<a href=\"%ZZ.png\">bad</a><a HREF=\"Another%20Game.png\">art</a>"
+        assertEquals(listOf("A+B (Europe).png", "Another Game.png"), LibretroArt.filenames(html))
     }
 
     @Test
