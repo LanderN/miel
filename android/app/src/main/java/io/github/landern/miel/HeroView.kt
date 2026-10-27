@@ -8,6 +8,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Shader
 import android.text.Layout
@@ -207,8 +208,137 @@ class HeroView(context: Context) : View(context) {
         }
         y += 16 * scale
         text(detail.description, 16f, lines = 3)
+        val preview = detail.preview
+        val ruleTop = height - gutter - scale
+        if (preview != null) {
+            y += 16 * scale
+            drawPreview(canvas, detail, scale, gutter, y, width - gutter, ruleTop - 16 * scale)
+        }
         paint.color = 0xffd8c49e.toInt()
         canvas.drawRect(gutter, height - gutter - scale, width - gutter, height - gutter, paint)
+    }
+
+    /** Two panels in a two-column grid between `top` and `bottom`; the current one is outlined. */
+    private fun drawPreview(
+        canvas: Canvas,
+        detail: SettingsDetail,
+        scale: Float,
+        left: Float,
+        top: Float,
+        right: Float,
+        bottom: Float,
+    ) {
+        val gap = 16 * scale
+        val column = (right - left - gap) / 2
+        val labelSize = 14 * scale * resources.configuration.fontScale
+        paint.textSize = labelSize
+        val labelHeight = paint.fontMetrics.run { descent - ascent }
+        val labelGap = 8 * scale
+        val panelHeight = minOf(bottom - top - labelHeight - labelGap, column * .75f)
+        if (panelHeight < 24 * scale) return
+        val resolution = detail.preview == SettingsPreview.RESOLUTION
+        val current = detail.previewValue
+        val values = if (resolution) listOf("1", if (current == "1") "4" else current) else LAYOUTS
+        val sideWidth = if (resolution) minOf(column, panelHeight) else column
+        values.forEachIndexed { index, value ->
+            val columnLeft = left + index * (column + gap)
+            val panelLeft = columnLeft + (column - sideWidth) / 2
+            bounds.set(panelLeft, top, panelLeft + sideWidth, top + panelHeight)
+            val selected = value == current
+            if (resolution) drawResolution(canvas, bounds, value.toIntOrNull() ?: 1, scale)
+            else drawLayout(canvas, bounds, value.toIntOrNull() ?: 1, scale)
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = (if (selected) 3 else 2) * scale
+            paint.color = if (selected) 0xffe9b44c.toInt() else 0xffede5d7.toInt()
+            val inset = paint.strokeWidth / 2
+            canvas.drawRoundRect(
+                bounds.left + inset,
+                bounds.top + inset,
+                bounds.right - inset,
+                bounds.bottom - inset,
+                14 * scale - inset,
+                14 * scale - inset,
+                paint,
+            )
+            paint.style = Paint.Style.FILL
+            paint.typeface = if (selected) titleFace else detailFace
+            paint.color = if (selected) 0xff4b3928.toInt() else 0xff6c5b46.toInt()
+            paint.textSize = labelSize
+            paint.textAlign = Paint.Align.CENTER
+            val label = if (resolution) "$value×" else if (value == "1") "1 row" else "2 rows"
+            canvas.drawText(
+                label,
+                bounds.centerX(),
+                bounds.bottom + labelGap - paint.fontMetrics.ascent,
+                paint,
+            )
+            paint.textAlign = Paint.Align.LEFT
+        }
+    }
+
+    /** One row of 3:4 tiles, or two rows of squares, inside `panel`. */
+    private fun drawLayout(canvas: Canvas, panel: RectF, rows: Int, scale: Float) {
+        val pad = 12 * scale
+        val gap = 6 * scale
+        val count = 4
+        val aspect = if (rows == 1) 4 / 3f else 1f
+        val fitWidth = (panel.width() - 2 * pad - (count - 1) * gap) / count
+        val fitHeight = (panel.height() - 2 * pad - (rows - 1) * gap) / rows / aspect
+        val tileWidth = minOf(fitWidth, fitHeight)
+        val tileHeight = tileWidth * aspect
+        val left = panel.left + (panel.width() - (count * tileWidth + (count - 1) * gap)) / 2
+        val top = panel.top + (panel.height() - (rows * tileHeight + (rows - 1) * gap)) / 2
+        paint.color = 0xffd8c49e.toInt()
+        for (row in 0 until rows) {
+            for (column in 0 until count) {
+                val x = left + column * (tileWidth + gap)
+                val y = top + row * (tileHeight + gap)
+                canvas.drawRoundRect(
+                    x,
+                    y,
+                    x + tileWidth,
+                    y + tileHeight,
+                    4 * scale,
+                    4 * scale,
+                    paint,
+                )
+            }
+        }
+    }
+
+    /** A sky square with a green diagonal edge drawn at `factor` times the base pixel density. */
+    private fun drawResolution(canvas: Canvas, panel: RectF, factor: Int, scale: Float) {
+        val radius = 14 * scale
+        val clip = Path().apply { addRoundRect(panel, radius, radius, Path.Direction.CW) }
+        val layer = canvas.save()
+        canvas.clipPath(clip)
+        paint.color = 0xff9cc3e6.toInt()
+        canvas.drawRect(panel, paint)
+        paint.color = 0xff4c8a3f.toInt()
+        val size = panel.width()
+        // Edge from 80% down the left side to 20% down the right side.
+        fun edge(fraction: Float) = panel.top + size * (.8f - .6f * fraction)
+        if (factor >= 4) {
+            val green =
+                Path().apply {
+                    moveTo(panel.left, edge(0f))
+                    lineTo(panel.right, edge(1f))
+                    lineTo(panel.right, panel.bottom)
+                    lineTo(panel.left, panel.bottom)
+                    close()
+                }
+            canvas.drawPath(green, paint)
+        } else {
+            val cells = factor * 8
+            val cell = size / cells
+            for (column in 0 until cells) {
+                val centre = (column + .5f) / cells
+                val steps = Math.round((edge(centre) - panel.top) / cell)
+                val x = panel.left + column * cell
+                canvas.drawRect(x, panel.top + steps * cell, x + cell + .5f, panel.bottom, paint)
+            }
+        }
+        canvas.restoreToCount(layer)
     }
 
     private fun drawArt(
@@ -285,6 +415,7 @@ class HeroView(context: Context) : View(context) {
     companion object {
         private val BACKGROUND = Color.rgb(63, 48, 36)
         private val EMPTY = Hero("", "", "")
+        private val LAYOUTS = listOf("1", "2")
 
         /**
          * Decodes `path`, halving its size while it still covers `width` × `height`. Returns null

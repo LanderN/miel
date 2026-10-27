@@ -1,11 +1,21 @@
 package io.github.landern.miel
 
+/** Settings whose effect the lower screen can draw. */
+enum class SettingsPreview {
+    /** `previewValue` is the number of game rows. */
+    LAYOUT,
+    /** `previewValue` is melonDS's `melonds_opengl_resolution` value. */
+    RESOLUTION,
+}
+
 /** Supplemental context for the selected upper-screen setting. */
 data class SettingsDetail(
     val context: String,
     val title: String,
     val value: String? = null,
     val description: String,
+    val preview: SettingsPreview? = null,
+    val previewValue: String = "",
 )
 
 internal fun settingsDetail(overlay: Overlay.Settings, session: Session): SettingsDetail {
@@ -21,7 +31,8 @@ internal fun settingsDetail(overlay: Overlay.Settings, session: Session): Settin
                     "Clear shader cache",
                     description = "Removes Azahar’s compiled and transferable shader caches.",
                 )
-        val current = option.label(session.optionValues(core, overlay.perGame).getValue(option.key))
+        val raw = session.optionValues(core, overlay.perGame).getValue(option.key)
+        val current = option.label(raw)
         val inherited = overlay.perGame && option.key !in session.gameOverrides()
         return SettingsDetail(
             context,
@@ -31,6 +42,8 @@ internal fun settingsDetail(overlay: Overlay.Settings, session: Session): Settin
                 "Follows the emulator’s default for this game. Changes apply on next launch."
             else if (overlay.perGame) "Applies to this game. Changes apply on next launch."
             else "Default for games without an override. Changes apply on next launch.",
+            if (option.key == "melonds_opengl_resolution") SettingsPreview.RESOLUTION else null,
+            raw,
         )
     }
     val title = SETTINGS.getOrNull(overlay.selected).orEmpty()
@@ -66,5 +79,7 @@ internal fun settingsDetail(overlay: Overlay.Settings, session: Session): Settin
             "${session.gameRows} ${if (session.gameRows == 1) "row" else "rows"}"
         else null,
         description,
+        if (overlay.selected == 0) SettingsPreview.LAYOUT else null,
+        session.gameRows.toString(),
     )
 }
