@@ -29,11 +29,11 @@ class Tap:
 
 # A single continuous pitch contour per cue; no delayed notes or sampled audio.
 TAPS = {
-    "navigate": Tap(310, 240, 0.065, 0.014, 0.105),
-    "confirm": Tap(390, 470, 0.110, 0.024, 0.140),
-    "back": Tap(300, 190, 0.090, 0.020, 0.120),
-    "open": Tap(260, 370, 0.100, 0.023, 0.125),
-    "error": Tap(185, 145, 0.125, 0.028, 0.140),
+    "navigate": Tap(310, 240, 0.065, 0.014, 0.525),
+    "confirm": Tap(390, 470, 0.110, 0.024, 0.700),
+    "back": Tap(300, 190, 0.090, 0.020, 0.600),
+    "open": Tap(260, 370, 0.100, 0.023, 0.625),
+    "error": Tap(185, 145, 0.125, 0.028, 0.700),
 }
 ATTACK = 0.004
 RELEASE = 0.012
@@ -48,11 +48,17 @@ def synthesize(tap: Tap) -> list[int]:
         remaining = (count - 1 - i) / RATE
         release = math.sin(math.pi / 2 * min(1, remaining / RELEASE)) ** 2
         envelope = attack * math.exp(-t / tap.decay) * release
-        phase = 2 * math.pi * (
-            tap.start_hz * t
-            + (tap.end_hz - tap.start_hz) * t * t / (2 * tap.duration)
+        phase = (
+            2
+            * math.pi
+            * (
+                tap.start_hz * t
+                + (tap.end_hz - tap.start_hz) * t * t / (2 * tap.duration)
+            )
         )
-        value = tap.amplitude * envelope * (math.sin(phase) + 0.08 * math.sin(2 * phase))
+        value = (
+            tap.amplitude * envelope * (math.sin(phase) + 0.08 * math.sin(2 * phase))
+        )
         samples.append(round(value * 32767))
     return samples
 
