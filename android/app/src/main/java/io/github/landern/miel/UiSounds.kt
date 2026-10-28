@@ -63,7 +63,7 @@ class UiSounds(context: Context) {
             if (now - lastNavigation < NAVIGATE_GAP) return
             lastNavigation = now
         }
-        pool.play(sample, .45f, .45f, 1, 0, 1f)
+        pool.play(sample, 1f, 1f, 1, 0, 1f)
     }
 
     fun release() {
