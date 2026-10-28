@@ -1164,7 +1164,16 @@ void loop(const Launch& launch, double fps) {
         if (writingPeriodic) periodicSaves++;
     };
 
+    bool streamPaused = false;
     while (!stopping) {
+        // The audio stream pauses with the game.
+        if (stream && paused != streamPaused) {
+            streamPaused = paused;
+            if (streamPaused)
+                AAudioStream_requestPause(stream);
+            else
+                AAudioStream_requestStart(stream);
+        }
         int analog = requestedAnalog.exchange(-1);
         if (analog >= 0 && launch.coreName == "PCSX-ReARMed") {
             api.set_controller_port_device(
