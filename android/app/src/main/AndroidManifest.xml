@@ -57,12 +57,6 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".ArtworkActivity"
-            android:configChanges="orientation|screenSize|screenLayout|density"
-            android:excludeFromRecents="true"
-            android:exported="false"
-            android:taskAffinity="io.github.landern.miel.artwork" />
-        <activity
             android:name=".CoreActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|density"
             android:exported="false"

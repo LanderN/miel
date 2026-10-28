@@ -59,7 +59,8 @@ class LibraryActivity : ComponentActivity() {
     private lateinit var artwork: ArtworkCache
     private lateinit var library: RomLibrary
     private lateinit var apps: AppList
-    private val displayListener = Displays.Listener(this) { ArtworkActivity.show(this) }
+    private val lowerArtwork = LowerArtwork(this)
+    private val displayListener = Displays.Listener(this) { lowerArtwork.show() }
     private var overlay by mutableStateOf<Overlay?>(null)
     private val keyFocus by lazy { View(this).apply { isFocusableInTouchMode = true } }
 
@@ -119,7 +120,6 @@ class LibraryActivity : ComponentActivity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
-        current = this
         session = Session(File(filesDir, "sessions-v1.json"))
         sounds = UiSounds(this)
         artwork = ArtworkCache(applicationContext) { artworkVersion++ }
@@ -146,33 +146,32 @@ class LibraryActivity : ComponentActivity() {
         setContent {
             Library(session, overlay, art, ::command)
             val hero = hero()
-            SideEffect { ArtworkActivity.update(hero) }
+            SideEffect { lowerArtwork.update(hero) }
             val typing = overlay is Overlay.RomMAddress
             LaunchedEffect(typing) { if (!typing) keyFocus.requestFocus() }
         }
         // Leaving touch mode consumes the first navigation key unless a plain View holds focus.
         addContentView(keyFocus, ViewGroup.LayoutParams(1, 1))
         displayListener.register()
-        ArtworkActivity.show(this)
+        lowerArtwork.show()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        ArtworkActivity.reclaim()
-        ArtworkActivity.close()
-        ArtworkActivity.show(this)
+        lowerArtwork.reclaim()
+        lowerArtwork.show()
     }
 
     override fun onResume() {
         super.onResume()
-        ArtworkActivity.dim(false)
+        lowerArtwork.dim(false)
         sounds.setActive(true)
-        ArtworkActivity.show(this)
+        lowerArtwork.show()
     }
 
     override fun onPause() {
-        ArtworkActivity.dim(true)
+        lowerArtwork.dim(true)
         sounds.setActive(false)
         keyDirection = null
         axisDirection = null
@@ -184,12 +183,11 @@ class LibraryActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        if (current == this) current = null
         library.close()
         apps.close()
         artwork.close()
         sounds.release()
-        ArtworkActivity.close()
+        lowerArtwork.close()
         displayListener.unregister()
         super.onDestroy()
     }
@@ -1072,7 +1070,7 @@ class LibraryActivity : ComponentActivity() {
                 )
         session.recordLaunch()
         sounds.play(Cue.CONFIRM)
-        ArtworkActivity.close()
+        lowerArtwork.close()
         startActivity(
             intent,
             ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY).toBundle(),
@@ -1103,7 +1101,7 @@ class LibraryActivity : ComponentActivity() {
             else
                 Displays.other(this, Display.DEFAULT_DISPLAY)?.displayId
                     ?: return fail("The bottom screen is unavailable.")
-        if (screen == Screen.BOTTOM) ArtworkActivity.yieldToApp()
+        if (screen == Screen.BOTTOM) lowerArtwork.yieldToApp()
         try {
             startActivity(
                 intent,
@@ -1215,17 +1213,6 @@ class LibraryActivity : ComponentActivity() {
 
         /** Shown until the next input. */
         private const val UNPLAYABLE = "This game’s platform or file format is not supported."
-
-        private var current: LibraryActivity? = null
-
-        /** Forwards a key from the artwork window to the library. */
-        fun artworkKey(event: KeyEvent) = current?.dispatchKeyEvent(event) == true
-
-        fun artworkMotion(event: MotionEvent) = current?.onGenericMotionEvent(event) == true
-
-        fun artworkBack() {
-            current?.command(Command.B)
-        }
 
         private fun direction(key: Int): Command? =
             when (key) {
