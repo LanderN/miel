@@ -58,6 +58,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: refs/tags/${{ steps.version.outputs.tag }}
+          fetch-depth: 0
           lfs: true
           persist-credentials: false
 
@@ -121,6 +122,11 @@ jobs:
           (cd artifacts/release && sha256sum miel-arm64-v8a.apk > miel-arm64-v8a.apk.sha256)
           (cd artifacts/release && sha256sum miel-arm64-v8a.apk miel-source.tar.gz > SHA256SUMS)
 
+      - name: Write release notes
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: scripts/release-notes.sh "$RELEASE_TAG" > artifacts/release/notes.md
+
       - name: Remove signing key
         if: always()
         run: rm -f "$RUNNER_TEMP/miel-release.jks"
@@ -159,7 +165,7 @@ jobs:
             fi
           else
             gh release create "$RELEASE_TAG" --verify-tag --draft --title "miel $RELEASE_TAG" \
-              --notes 'Download miel-arm64-v8a.apk to install. Corresponding source, core dependencies, build scripts and patches are in miel-source.tar.gz. Third-party components retain their individual licenses. Checksums are in SHA256SUMS.'
+              --notes-file notes.md
           fi
           gh release upload "$RELEASE_TAG" miel-arm64-v8a.apk miel-arm64-v8a.apk.sha256 miel-source.tar.gz SHA256SUMS --clobber
-          gh release edit "$RELEASE_TAG" --draft=false --latest
+          gh release edit "$RELEASE_TAG" --notes-file notes.md --draft=false --latest
