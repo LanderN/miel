@@ -437,8 +437,11 @@ class CoreActivity : ComponentActivity() {
                 intent.getStringExtra(EXTRA_ROMM_TOKEN).orEmpty(),
                 file,
             ) {
-                stagingProgress = it
+                stagingStatus = it.status
+                stagingProgress = it.fraction
             }
+            stagingStatus = "Preparing your game…"
+            stagingProgress = LoadingOverlay.PULSE
         }
         return file
     }

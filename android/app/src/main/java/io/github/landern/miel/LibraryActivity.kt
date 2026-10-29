@@ -222,7 +222,6 @@ class LibraryActivity : ComponentActivity() {
         } else {
             session.game?.let { game ->
                 val frame = artwork.frame(game)?.takeIf { it.isFile }
-                val boxart = artwork.boxartPath(game)
                 val detail =
                     listOf(game.platform, if (game.year > 0) "${game.year}" else "", game.genre)
                         .filter { it.isNotEmpty() }
@@ -230,8 +229,7 @@ class LibraryActivity : ComponentActivity() {
                 Hero(
                     game.title,
                     detail,
-                    frame?.path ?: boxart.ifEmpty { artwork.heroPath(game.id) },
-                    boxart = frame == null && boxart.isNotEmpty(),
+                    frame?.path ?: artwork.heroPath(game.id),
                     played = PlayTime.describe(this, game.id),
                 )
             } ?: Hero(if (session.games.isEmpty()) "No games" else "No recent games", "", "")

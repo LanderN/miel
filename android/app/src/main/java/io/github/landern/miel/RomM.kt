@@ -69,6 +69,24 @@ class RomM(private val context: Context) {
         val boxart: String = "",
     )
 
+    /** Bytes received, response size when known, and the latest transfer rate. */
+    data class DownloadProgress(val received: Long, val total: Long, val bytesPerSecond: Double) {
+        val fraction: Float
+            get() =
+                if (total > 0) (received.toDouble() / total).coerceIn(0.0, 1.0).toFloat() else -1f
+
+        val status: String
+            get() {
+                val percent = if (total > 0) " ${(fraction * 100).toInt()}%" else ""
+                val amount =
+                    if (total > 0) "${mb(received.toDouble())} / ${mb(total.toDouble())} MB"
+                    else "${mb(received.toDouble())} MB"
+                return "Downloading your game…$percent\n$amount · ${mb(bytesPerSecond)} MB/s"
+            }
+
+        private fun mb(bytes: Double) = String.format("%.1f", bytes / 1_000_000)
+    }
+
     /** A sync session and the server's newest autosave of each game it covers, by game ID. */
     class Session(val id: Int, val saves: Map<Int, Save>)
 
@@ -359,10 +377,16 @@ class RomM(private val context: Context) {
             }
 
         /**
-         * Downloads a game from `link` with the device `token` to `target`, reporting the fraction
-         * received when the size is known. Needs no preferences, so another process can call it.
+         * Downloads a game from `link` with the device `token` to `target`, reporting bytes
+         * received, response size and transfer rate. Needs no preferences, so another process can
+         * call it.
          */
-        fun download(link: String, token: String, target: File, progress: (Float) -> Unit) {
+        fun download(
+            link: String,
+            token: String,
+            target: File,
+            progress: (DownloadProgress) -> Unit,
+        ) {
             val connection = open("GET", link, token)
             val size = connection.contentLengthLong
             val temporary = File(target.parentFile, target.name + ".part")
@@ -371,14 +395,29 @@ class RomM(private val context: Context) {
                     FileOutputStream(temporary).use { output ->
                         val buffer = ByteArray(256 * 1024)
                         var received = 0L
+                        var sampledBytes = 0L
+                        var sampledAt = System.nanoTime()
+                        var speed = 0.0
+                        fun report() {
+                            val now = System.nanoTime()
+                            if (received > sampledBytes) {
+                                speed =
+                                    (received - sampledBytes) * 1_000_000_000.0 / (now - sampledAt)
+                            }
+                            progress(DownloadProgress(received, size, speed))
+                            sampledBytes = received
+                            sampledAt = now
+                        }
+                        report()
                         while (true) {
                             val count = input.read(buffer)
                             if (count == -1) break
                             if (Thread.currentThread().isInterrupted) throw InterruptedIOException()
                             output.write(buffer, 0, count)
                             received += count
-                            if (size > 0) progress(minOf(1f, received / size.toFloat()))
+                            if (System.nanoTime() - sampledAt >= 500_000_000L) report()
                         }
+                        report()
                         output.fd.sync()
                     }
                 }

@@ -20,7 +20,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Covers, front box art and screenshots from local sidecars, Steam, RomM and Libretro's thumbnail server,
+ * Covers and screenshots from local sidecars, Steam, RomM and Libretro's thumbnail server,
  * kept in files/artwork/libretro-v1. Cached images are published before any request; downloads run
  * one at a time on a background thread, covers first.
  */
@@ -44,10 +44,6 @@ class ArtworkCache(
     fun coverPath(id: String): String = paths["${LibretroArt.BOXARTS}:$id"] ?: ""
 
     fun heroPath(id: String): String = paths["${LibretroArt.SNAPS}:$id"] ?: ""
-
-    fun boxartPath(game: Game): String =
-        paths["$FRONT_BOXART:${game.id}"]
-            ?: if (game.rommId == 0) coverPath(game.id) else ""
 
     /** CoreActivity's JPEG of `game`'s upper screen at its last checkpoint, per core version. */
     fun frame(game: Game): File? =
@@ -149,7 +145,6 @@ class ArtworkCache(
     private fun sourceFor(game: Game, kind: String): String =
         when (kind) {
             LibretroArt.BOXARTS -> game.cover
-            FRONT_BOXART -> game.boxart
             else -> game.screenshot
         }
 
@@ -162,7 +157,6 @@ class ArtworkCache(
                 val recorded = File(directory, stem(game.id, kind) + ".source.txt")
                 val previous = if (recorded.isFile) recorded.readText() else ""
                 val source = sourceFor(game, kind)
-                if (kind == FRONT_BOXART && source.isEmpty()) continue
                 if (previous.startsWith("content:") && previous != source) continue
                 if (valid(file)) paths["$kind:${game.id}"] = file.absolutePath
             }
@@ -185,7 +179,7 @@ class ArtworkCache(
                 val recorded = File(directory, stem(game.id, kind) + ".source.txt")
                 !(paths.containsKey("$kind:${game.id}") && recorded.isFile && recorded.readText() == source)
             } else {
-                kind != FRONT_BOXART && !paths.containsKey("$kind:${game.id}") && game.system.isNotEmpty()
+                !paths.containsKey("$kind:${game.id}") && game.system.isNotEmpty()
             }
         }
         if (pending.isEmpty() || !current(request)) return
@@ -199,7 +193,6 @@ class ArtworkCache(
             val supplied = sourceFor(game, kind)
             val asset = when (kind) {
                 LibretroArt.BOXARTS -> "Cover art"
-                FRONT_BOXART -> "Front box art"
                 else -> "Screenshot"
             }
             val provider = if (supplied.isEmpty()) "Libretro" else "Library source"
@@ -254,8 +247,7 @@ class ArtworkCache(
 
     private companion object {
         const val TAG = "MielArtwork"
-        const val FRONT_BOXART = "Box2DFront"
-        val KINDS = listOf(LibretroArt.BOXARTS, FRONT_BOXART, LibretroArt.SNAPS)
+        val KINDS = listOf(LibretroArt.BOXARTS, LibretroArt.SNAPS)
         const val THREE_DS = "Nintendo - Nintendo 3DS"
 
         /**
@@ -336,7 +328,6 @@ class ArtworkCache(
             if (!id.matches(Regex("[a-z0-9-]+"))) throw IOException("Invalid game ID")
             return when (kind) {
                 LibretroArt.BOXARTS -> id
-                FRONT_BOXART -> "$id-box2d-v1"
                 else -> "$id-snap-v1"
             }
         }

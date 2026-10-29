@@ -30,15 +30,13 @@ data class Hero(
     /** Draws `art` centred instead of covering the screen. */
     val icon: Boolean = false,
     val settings: SettingsDetail? = null,
-    /** Fills the screen with front box art, without a text overlay. */
-    val boxart: Boolean = false,
     /** Play time and last played, below `detail`; see PlayTime.describe. */
     val played: String = "",
 )
 
 /**
- * The lower screen: box art, screenshot details or setting context, drawn with Canvas. A new
- * selection crossfades in once its art is decoded off the UI thread.
+ * The lower screen: screenshot details or setting context, drawn with Canvas. A new selection
+ * crossfades in once its art is decoded off the UI thread.
  */
 class HeroView(context: Context) : View(context) {
     private val paint = TextPaint(Paint.ANTI_ALIAS_FLAG)
@@ -135,7 +133,7 @@ class HeroView(context: Context) : View(context) {
         // The library's 24dp gutter, scaled down on small displays.
         val scale = minOf(resources.displayMetrics.density, width / 480f, height / 270f)
         canvas.drawColor(BACKGROUND)
-        if (from.settings == null && to.settings == null && !from.boxart && !to.boxart) {
+        if (from.settings == null && to.settings == null) {
             val fromAlpha = if (toArt != null && !to.icon) 1f else 1 - progress
             drawArt(canvas, from, fromArt, fromAlpha, scale, width, height)
             drawArt(canvas, to, toArt, progress, scale, width, height)
@@ -163,9 +161,6 @@ class HeroView(context: Context) : View(context) {
         if (settings != null) {
             canvas.drawColor(0xfff5efe4.toInt())
             drawSettings(canvas, settings, scale, width, height)
-        } else if (hero.boxart) {
-            canvas.drawColor(0xfff5efe4.toInt())
-            drawArt(canvas, hero, art, 1f, scale, width, height)
         } else {
             canvas.drawColor(BACKGROUND)
             drawArt(canvas, hero, art, 1f, scale, width, height)
