@@ -66,13 +66,18 @@ if args.sources:
             manifest = json.loads(
                 (Path("third_party") / name / "manifest.json").read_text()
             )
-            upstream = core.parent / manifest["source_url"].rsplit("/", 1)[-1]
-            if (
-                hashlib.sha256(upstream.read_bytes()).hexdigest()
-                != manifest["source_sha256"]
-            ):
-                raise SystemExit(f"Source archive hash mismatch: {upstream}")
-            archive.add(upstream, arcname=f"miel/{upstream}")
+            sources = [
+                {"url": manifest["source_url"], "sha256": manifest["source_sha256"]},
+                *manifest.get("dependencies", []),
+            ]
+            for source in sources:
+                upstream = core.parent / source["url"].rsplit("/", 1)[-1]
+                if (
+                    hashlib.sha256(upstream.read_bytes()).hexdigest()
+                    != source["sha256"]
+                ):
+                    raise SystemExit(f"Source archive hash mismatch: {upstream}")
+                archive.add(upstream, arcname=f"miel/{upstream}")
             for dependency in dependencies[name]:
                 archive.add(
                     dependency,

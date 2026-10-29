@@ -17,6 +17,7 @@ enum class Core(
     val dual: Boolean,
     /** The lower screen's side margins in the frame, as a fraction of its width. */
     val lowerInset: Float,
+    val displayName: String = coreName,
 ) {
     AZAHAR(
         setOf("Nintendo 3DS"),
@@ -80,6 +81,16 @@ enum class Core(
         setOf("iso", "cso", "pbp", "chd", "elf", "prx"),
         dual = false,
         lowerInset = 0f,
+    ),
+    DOLPHIN(
+        setOf("GameCube"),
+        "libdolphin_libretro.so",
+        "dolphin-emu",
+        "2609.0.0+b93001ed50",
+        setOf("gcm", "iso", "rvz", "gcz", "wia", "ciso", "dol", "elf"),
+        dual = false,
+        lowerInset = 0f,
+        displayName = "Dolphin",
     );
 
     /** Whether the left stick also drives the d-pad, for systems without an analog stick. */
@@ -134,6 +145,7 @@ enum class Core(
             FCEUMM,
             BSNES -> emptyArray()
             PPSSPP -> arrayOf("ppsspp_backend", "opengl", "ppsspp_internal_resolution", "960x544")
+            DOLPHIN -> arrayOf("dolphin_efb_scale", "1", "dolphin_shader_compilation_mode", "0")
             PCSX -> arrayOf("pcsx_rearmed_memcard1", "libretro", "pcsx_rearmed_memcard2", "none")
         }
 

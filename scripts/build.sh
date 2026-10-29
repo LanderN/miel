@@ -82,6 +82,7 @@ core() {
     src=$PWD/.tools/$name/src-$({
         field source_sha256
         field melonds_sha256
+        if [ "$name" = dolphin ]; then cat "$manifest"; fi
         cat $patches $dependency_patches /dev/null
     } | shasum -a 256 | cut -c1-12)
     core_sources+=("$src")
@@ -95,6 +96,7 @@ core() {
         rm -rf ".tools/$name"/src-*
         mkdir -p "$src"
         tar -xf "$tarball" -C "$src" --strip-components 1
+        python3 scripts/core-dependencies.py "$manifest" "$src" ".tools/$name"
         for p in $patches; do patch -d "$src" -p1 --quiet <"$p"; done
         if [ "$name" = melonds-ds ]; then
             local melonds_tarball=.tools/$name/melonds-$(field melonds_sha256 | cut -c1-12).tar.gz
@@ -115,6 +117,10 @@ core() {
                 APP_ABI=arm64-v8a APP_PLATFORM=android-29 APP_STL=c++_static \
                 "GIT_VERSION=\"$(field git_version)\"" -j4
         else
+            if [ "$name" = dolphin ]; then
+                set -- "$@" -DDOLPHIN_WC_REVISION="$(field git_version)" \
+                    -DDOLPHIN_WC_DESCRIBE=2609 -DDOLPHIN_WC_BRANCH=master
+            fi
             if [ "$name" = ppsspp ]; then
                 (cd "$src/ffmpeg" && NDK_PREBUILT="$core_ndk/toolchains/llvm/prebuilt/$host" \
                     NDK_USR_LIB="$core_ndk/toolchains/llvm/prebuilt/$host/sysroot/usr/lib/aarch64-linux-android/21" \
@@ -133,6 +139,12 @@ core() {
         rm -rf "$assets"
         mkdir -p "$assets"
         cp -R "$src/assets/." "$assets/"
+    fi
+    if [ "$name" = dolphin ]; then
+        local assets=android/app/build/generated/core-assets/dolphin-emu/Sys
+        rm -rf "$assets"
+        mkdir -p "$assets"
+        cp -R "$src/Data/Sys/." "$assets/"
     fi
 }
 
@@ -155,6 +167,9 @@ if [ "$abi" = arm64-v8a ]; then
     core ppsspp ppsspp_libretro_android ppsspp_libretro -DANDROID_PLATFORM=android-29 \
         -DCMAKE_BUILD_TYPE=Release -DLIBRETRO=ON -DUNITTEST=OFF -DATLAS_TOOL=OFF \
         -DUSE_DISCORD=OFF -DUSE_MINIUPNPC=OFF
+    core dolphin dolphin_libretro_android dolphin_libretro -DANDROID_PLATFORM=android-29 \
+        -DCMAKE_BUILD_TYPE=Release -DLIBRETRO=ON -DENABLE_VULKAN=OFF -DUSE_MGBA=OFF \
+        -DUSE_SYSTEM_LIBS=OFF
     source_args=("${core_sources[@]}")
     if [ "$target" = release ]; then
         source_args=(--sources artifacts/release/miel-source.tar.gz "${source_args[@]}")

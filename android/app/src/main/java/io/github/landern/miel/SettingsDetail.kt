@@ -22,8 +22,8 @@ internal fun settingsDetail(overlay: Overlay.Settings, session: Session): Settin
     val core = overlay.core
     if (core != null) {
         val context =
-            if (overlay.perGame) "${core.coreName} · ${session.game?.title.orEmpty()}"
-            else "${core.coreName} · Defaults for all games"
+            if (overlay.perGame) "${core.displayName} · ${session.game?.title.orEmpty()}"
+            else "${core.displayName} · Defaults for all games"
         val option =
             core.settingOptions.getOrNull(overlay.selected)
                 ?: return SettingsDetail(

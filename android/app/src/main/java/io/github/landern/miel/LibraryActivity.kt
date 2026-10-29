@@ -816,6 +816,8 @@ class LibraryActivity : ComponentActivity() {
                     if (game.core == Core.AZAHAR) AzaharSaves.unpack(titleId(game), file)
                     if (game.core == Core.PPSSPP)
                         PspSaves.unpack(SaveStorage.memoryStick(game.romFilename), file)
+                    if (game.core == Core.DOLPHIN)
+                        DolphinSaves.unpack(SaveStorage.gameCube(game.romFilename), file)
                 }
             "upload" -> romm.push(session, game.rommId, file, game.core!!.coreName)
         }
@@ -874,6 +876,16 @@ class LibraryActivity : ComponentActivity() {
      */
     private fun syncFile(game: Game): File? {
         val core = game.core ?: return null
+        if (core == Core.DOLPHIN) {
+            val archive =
+                File(
+                    cacheDir,
+                    "romm-saves/GameCube/${game.romFilename.substringBeforeLast('.')}.zip",
+                )
+            archive.parentFile?.mkdirs()
+            DolphinSaves.pack(SaveStorage.gameCube(game.romFilename), archive)
+            return archive
+        }
         if (core == Core.PPSSPP) {
             val archive =
                 File(cacheDir, "romm-saves/PSP/${game.romFilename.substringBeforeLast('.')}.zip")

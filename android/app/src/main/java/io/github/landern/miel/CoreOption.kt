@@ -25,6 +25,54 @@ private fun toggle(key: String, label: String, enabled: Boolean = false) =
 val Core.settingOptions: List<CoreOption>
     get() =
         when (this) {
+            Core.DOLPHIN ->
+                listOf(
+                    CoreOption(
+                        "dolphin_efb_scale",
+                        "Resolution",
+                        (1..4).map(Int::toString),
+                        (1..4).map { "$it×" },
+                    ),
+                    toggle("dolphin_main_cpu_thread", "Dual-core emulation", true),
+                    CoreOption(
+                        "dolphin_shader_compilation_mode",
+                        "Shader compilation",
+                        listOf("0", "1", "2", "3"),
+                        listOf(
+                            "Synchronous",
+                            "Synchronous ubershaders",
+                            "Async ubershaders",
+                            "Skip drawing",
+                        ),
+                    ),
+                    CoreOption(
+                        "dolphin_anti_aliasing",
+                        "Anti-aliasing",
+                        listOf("0", "1", "2", "3", "4", "5", "6"),
+                        listOf(
+                            "Off",
+                            "2× MSAA",
+                            "4× MSAA",
+                            "8× MSAA",
+                            "2× SSAA",
+                            "4× SSAA",
+                            "8× SSAA",
+                        ),
+                    ),
+                    CoreOption(
+                        "dolphin_aspect_ratio",
+                        "Aspect ratio",
+                        listOf("3", "2", "1"),
+                        listOf("Automatic", "4:3", "16:9"),
+                    ),
+                    toggle("dolphin_widescreen_hack", "Widescreen hack"),
+                    CoreOption(
+                        "dolphin_language",
+                        "System language",
+                        listOf("1", "0", "2", "3", "4", "5"),
+                        listOf("English", "Japanese", "German", "French", "Spanish", "Italian"),
+                    ),
+                )
             Core.AZAHAR ->
                 listOf(
                     CoreOption(

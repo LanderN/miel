@@ -1,0 +1,7 @@
+--- a/Source/Core/DolphinLibretro/Boot.cpp
++++ b/Source/Core/DolphinLibretro/Boot.cpp
+@@ -284,0 +285 @@
++#ifdef HAS_LIBMGBA
+@@ -298,0 +300,2 @@
++
++#endif

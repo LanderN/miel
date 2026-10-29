@@ -1,0 +1,6 @@
+--- a/CMake/ScmRevGen.cmake
++++ b/CMake/ScmRevGen.cmake
+@@ -4 +4,2 @@
+-if(GIT_FOUND)
++set(DOLPHIN_WC_COMMITS_AHEAD_MASTER 0)
++if(GIT_FOUND AND NOT DOLPHIN_WC_REVISION)

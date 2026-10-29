@@ -140,7 +140,7 @@ val SETTINGS =
         "RomM",
         "Redownload metadata",
     ) +
-        Core.entries.map { it.coreName } +
+        Core.entries.map { it.displayName } +
         listOf("Remove downloaded art", "Set as default launcher", "miel updates", "Licenses")
 
 const val CORE_SETTINGS_START = 6
@@ -1043,7 +1043,12 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
         Modifier.fillMaxSize().background(Miel.background).padding(Miel.margin),
         verticalArrangement = Arrangement.spacedBy(Miel.gap),
     ) {
-        Text(core?.coreName ?: "Settings", color = Miel.ink, size = 28.sp, weight = FontWeight.Bold)
+        Text(
+            core?.displayName ?: "Settings",
+            color = Miel.ink,
+            size = 28.sp,
+            weight = FontWeight.Bold,
+        )
         if (core != null) {
             Text(
                 if (overlay.perGame) session.game?.title.orEmpty()

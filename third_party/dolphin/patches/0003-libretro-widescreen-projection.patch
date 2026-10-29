@@ -1,0 +1,12 @@
+diff --git a/Source/Core/VideoCommon/Present.cpp b/Source/Core/VideoCommon/Present.cpp
+index 9989001..384e647 100644
+--- a/Source/Core/VideoCommon/Present.cpp
++++ b/Source/Core/VideoCommon/Present.cpp
+@@ -753 +753,6 @@ void Presenter::UpdateDrawRectangle()
+-    const float adjust = source_aspect_ratio / draw_aspect_ratio;
++#ifdef __LIBRETRO__
++    const float target_aspect_ratio = SourceAspectRatioToWidescreen(vi.GetAspectRatio());
++#else
++    const float target_aspect_ratio = draw_aspect_ratio;
++#endif
++    const float adjust = source_aspect_ratio / target_aspect_ratio;

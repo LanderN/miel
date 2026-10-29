@@ -32,6 +32,7 @@ enum class Tab(val label: String, val platform: String? = null) {
     SNES("SNES", "SNES"),
     PSX("PSX", "PlayStation"),
     PSP("PSP", "PSP"),
+    GAMECUBE("GC", "GameCube"),
     PC("PC", DroidDeck.PLATFORM),
     APPS("Apps"),
 }

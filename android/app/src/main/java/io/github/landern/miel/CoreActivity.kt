@@ -374,7 +374,7 @@ class CoreActivity : ComponentActivity() {
     private fun prepareGame() {
         if (!File(nativeLibrary(core.library)).isFile) {
             fail(
-                "${core.coreName} is packaged for ARM64 Thor hardware. This device needs an ARM64 build.",
+                "${core.displayName} is packaged for ARM64 Thor hardware. This device needs an ARM64 build.",
             )
             return
         }
@@ -489,6 +489,8 @@ class CoreActivity : ComponentActivity() {
             if (!diagnostic && core == Core.PPSSPP)
                 SaveStorage.memoryStick(intent.getStringExtra(EXTRA_FILENAME).orEmpty())
                     .absolutePath
+            else if (!diagnostic && core == Core.DOLPHIN)
+                SaveStorage.gameCube(intent.getStringExtra(EXTRA_FILENAME).orEmpty()).absolutePath
             else File(root, "saves").absolutePath,
             statePath,
             savePath,

@@ -1,0 +1,104 @@
+{
+  "project": "Dolphin",
+  "version": "2609.0.0+b93001ed50",
+  "release_url": "https://github.com/libretro/dolphin/tree/b93001ed50c8b34e6ead4eed713c2005a80386e4",
+  "source_url": "https://github.com/libretro/dolphin/archive/b93001ed50c8b34e6ead4eed713c2005a80386e4.tar.gz",
+  "source_sha256": "9533a1b9d69a399b3520738bbc793ab91f30414aab575d590401df17b6188adc",
+  "android_ndk": "29.0.14206865",
+  "android_cmake": "3.30.3",
+  "license": "GPL-2.0-or-later; see source for dependency and asset licenses",
+  "dependencies": [
+    {
+      "path": "Externals/zlib-ng/zlib-ng",
+      "url": "https://github.com/zlib-ng/zlib-ng/archive/ce01b1e41da298334f8214389cc9369540a7560f.tar.gz",
+      "sha256": "64a6d355d2d5c9449fc047e5bb0ca32875fc385061dfaf1df3aa791577b7ff5e"
+    },
+    {
+      "path": "Externals/libspng/libspng",
+      "url": "https://github.com/randy408/libspng/archive/fb768002d4288590083a476af628e51c3f1d47cd.tar.gz",
+      "sha256": "d656813290d70a750b69e768323ff3b3875adf8c2e8c2fdb4e57ca1467abf86a"
+    },
+    {
+      "path": "Externals/implot/implot",
+      "url": "https://github.com/epezent/implot/archive/3da8bd34299965d3b0ab124df743fe3e076fa222.tar.gz",
+      "sha256": "4700b44ef00ca2feba0b35a31922c240045bbeb900da5b3eb3830b56871ada45"
+    },
+    {
+      "path": "Externals/curl/curl",
+      "url": "https://github.com/curl/curl/archive/cfbfb65047e85e6b08af65fe9cdbcf68e9ad496a.tar.gz",
+      "sha256": "fce60dc771129b50010a91efc575657550a83ce6b81eb4a77c4ebd0af44582c3"
+    },
+    {
+      "path": "Externals/fmt/fmt",
+      "url": "https://github.com/fmtlib/fmt/archive/e424e3f2e607da02742f73db84873b8084fc714c.tar.gz",
+      "sha256": "8e9b9d9e5b4d5e0a9094f349bec933f83e48a22e587bcf677534499fc5549202"
+    },
+    {
+      "path": "Externals/lz4/lz4",
+      "url": "https://github.com/lz4/lz4/archive/5fc0630a0ed55e9755b0fe3990cd021ae1c3edc1.tar.gz",
+      "sha256": "e969c292da59dd1163b3daabf31728f14f1dbe6a007e73e1cc6659fee6979bd2"
+    },
+    {
+      "path": "Externals/xxhash/xxHash",
+      "url": "https://github.com/Cyan4973/xxHash/archive/e626a72bc2321cd320e953a0ccf1584cad60f363.tar.gz",
+      "sha256": "34e71c085636fbc1726482996d92719d0a16e6a6097970ecf2990a27b3821162"
+    },
+    {
+      "path": "Externals/enet/enet",
+      "url": "https://github.com/lsalzman/enet/archive/2662c0de09e36f2a2030ccc2c528a3e4c9e8138a.tar.gz",
+      "sha256": "37381831c5ccbb41c3c71e867203fee847670f67717f297f930290d18985ad5f"
+    },
+    {
+      "path": "Externals/tinygltf/tinygltf",
+      "url": "https://github.com/syoyo/tinygltf/archive/c5641f2c22d117da7971504591a8f6a41ece488b.tar.gz",
+      "sha256": "6352803f1ed18d479ea93abf96ac75c0222a21403be22840bde1072ee5935dfa"
+    },
+    {
+      "path": "Externals/minizip-ng/minizip-ng",
+      "url": "https://github.com/zlib-ng/minizip-ng/archive/55db144e03027b43263e5ebcb599bf0878ba58de.tar.gz",
+      "sha256": "e0fa42896ad244261f100fd06fae7c64f6054ce02d143f4d0f55df5fced9f63d"
+    },
+    {
+      "path": "Externals/watcher/watcher",
+      "url": "https://github.com/e-dant/watcher/archive/b03bdcfc11549df595b77239cefe2643943a3e2f.tar.gz",
+      "sha256": "61e97c12c3d23f2b6588d99ce61c8ad462b4382f979d14c7a338a11af507edd1"
+    },
+    {
+      "path": "Externals/SFML/SFML",
+      "url": "https://github.com/SFML/SFML/archive/0fa201c969e48ecc253581c5841ce73f44d42f49.tar.gz",
+      "sha256": "df03afdc2858d0e15e1c9ff06bddd113c18b2a6c089532f5b8d05dbb2e653f2a"
+    },
+    {
+      "path": "Externals/zstd/zstd",
+      "url": "https://github.com/facebook/zstd/archive/711e17da98510a3567bf47f85a08a76f64811474.tar.gz",
+      "sha256": "68458484cdc8c1e5aa6a2bf3a0253eedb1db9387e42bfb80598e392553162cee"
+    },
+    {
+      "path": "Externals/glslang/glslang",
+      "url": "https://github.com/KhronosGroup/glslang/archive/a57276bf558f5cf94d3a9854ebdf5a2236849a5a.tar.gz",
+      "sha256": "02f4321a3ed01b9a9a9874f76e2d8ad078825818fcc9aae12dbf2c01674fb8af"
+    },
+    {
+      "path": "Externals/pugixml/pugixml",
+      "url": "https://github.com/zeux/pugixml/archive/ee86beb30e4973f5feffe3ce63bfa4fbadf72f38.tar.gz",
+      "sha256": "51c102d4187fac99daa38af281b0772c5e6c586f65004cdc63f8f2e011a21492"
+    },
+    {
+      "path": "Externals/cpp-optparse/cpp-optparse",
+      "url": "https://github.com/weisslj/cpp-optparse/archive/2265d647232249a53a03b411099863ceca35f0d3.tar.gz",
+      "sha256": "6f38fff3c4d2788eead7a28626b3220cc4c101510fc984678ad55f77756b107e"
+    },
+    {
+      "path": "Externals/bzip2/bzip2",
+      "url": "https://gitlab.com/bzip2/bzip2/-/archive/6a8690fc8d26c815e798c588f796eabe9d684cf0/bzip2-6a8690fc8d26c815e798c588f796eabe9d684cf0.tar.gz",
+      "sha256": "bc40651201886d3e126a8fff33163076e65918d422ce1f18749362984a8ce01d"
+    },
+    {
+      "path": "Externals/imgui/imgui",
+      "url": "https://github.com/ocornut/imgui/archive/45acd5e0e82f4c954432533ae9985ff0e1aad6d5.tar.gz",
+      "sha256": "97484925aec2f4d3e913d6644d46b234f8d6d8d98c6aa9c50109e0f0df772090"
+    }
+  ],
+  "notes": "GameCube with ARM64 JIT, OpenGL ES and per-game GCI memory cards. Runtime Sys assets are packaged from the pinned source. Game Boy Player and Vulkan are disabled.",
+  "git_version": "b93001ed50c8b34e6ead4eed713c2005a80386e4"
+}

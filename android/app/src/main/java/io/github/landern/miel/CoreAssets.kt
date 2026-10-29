@@ -6,12 +6,17 @@ import java.io.File
 /** Bundled runtime files extracted for cores that require filesystem paths. */
 object CoreAssets {
     fun system(context: Context, core: Core): File {
-        if (core != Core.PPSSPP) return File(SaveStorage.root(), "system")
-        val root = File(context.filesDir, "core-assets/ppsspp-${core.version}")
+        val (asset, folder) =
+            when (core) {
+                Core.PPSSPP -> "ppsspp" to "PPSSPP"
+                Core.DOLPHIN -> "dolphin-emu" to "dolphin-emu"
+                else -> return File(SaveStorage.root(), "system")
+            }
+        val root = File(context.filesDir, "core-assets/$asset-${core.version}")
         val marker = File(root, ".complete")
         if (!marker.isFile) {
             root.deleteRecursively()
-            copy(context, "ppsspp", File(root, "PPSSPP"))
+            copy(context, asset, File(root, folder))
             marker.writeText(core.version)
         }
         return root

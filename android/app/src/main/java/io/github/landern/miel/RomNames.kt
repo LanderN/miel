@@ -54,6 +54,7 @@ object RomNames {
                     inFolder(path, "psp", "playstation portable", "sony playstation portable") ->
                         "PSP"
                     inFolder(path, "ps1", "psx", "playstation", "sony playstation") -> "PlayStation"
+                    inFolder(path, "gc", "ngc", "gamecube", "nintendo gamecube") -> "GameCube"
                     inFolder(path, "nes", "famicom", "nintendo entertainment system") -> "NES"
                     inFolder(
                         path,
@@ -67,6 +68,10 @@ object RomNames {
             }
             "iso",
             "rvz",
+            "gcz",
+            "wia",
+            "ciso",
+            "dol",
             "chd",
             "pbp",
             "exe",
@@ -86,10 +91,10 @@ object RomNames {
                             "playstation portable",
                             "sony playstation portable",
                         ) -> "PSP"
-                    (iso || rvz) && inFolder(path, "gc", "ngc", "gamecube", "nintendo gamecube") ->
-                        "GameCube"
+                    ext in setOf("iso", "rvz", "gcz", "wia", "ciso", "dol", "elf") &&
+                        inFolder(path, "gc", "ngc", "gamecube", "nintendo gamecube") -> "GameCube"
                     (iso || rvz) && inFolder(path, "wii", "nintendo wii") -> "Wii"
-                    ext !in setOf("rvz", "elf", "prx") &&
+                    ext in setOf("iso", "chd", "pbp", "exe", "bin", "cue", "m3u") &&
                         inFolder(path, "ps1", "psx", "playstation", "sony playstation") ->
                         "PlayStation"
                     else -> ""

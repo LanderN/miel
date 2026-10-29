@@ -126,6 +126,7 @@ std::atomic<uint64_t> audioDropped{0}, audioUnderruns{0};
 // Controller and touch state, as libretro reads it.
 std::atomic<uint32_t> buttons{0}, hats{0}, triggerButtons{0};
 std::atomic<int16_t> axes[4], pointerX{0}, pointerY{0};
+std::atomic<int16_t> triggers[2]{};
 std::atomic<bool> pointerDown{false};
 std::atomic<uint16_t> rumbleMotors[2]{};
 std::atomic<uint64_t> rumbleRequests{0}, rumblePeak{0};
@@ -153,6 +154,7 @@ EGLConfig config;
 // screen inset from the sides by `lowerInset` of the width. A single-screen frame goes up.
 bool stacked = true;
 float lowerInset = 0;
+float displayAspect = 0;
 GLuint framebuffer = 0, texture = 0, depthBuffer = 0;
 unsigned width = 400, height = 480, allocatedWidth = 0, allocatedHeight = 0;
 retro_hw_render_callback hw{};
@@ -298,9 +300,11 @@ void present(int slot, int x0, int y0, int x1, int y1) {
         EGLint w = 0, h = 0;
         eglQuerySurface(display, output.surface, EGL_WIDTH, &w);
         eglQuerySurface(display, output.surface, EGL_HEIGHT, &h);
-        float scale = std::min(float(w) / std::abs(x1 - x0), float(h) / std::abs(y1 - y0));
-        int dw = std::lround(std::abs(x1 - x0) * scale),
-            dh = std::lround(std::abs(y1 - y0) * scale);
+        float contentHeight = std::abs(y1 - y0);
+        float contentWidth =
+            !stacked && displayAspect > 0 ? contentHeight * displayAspect : std::abs(x1 - x0);
+        float scale = std::min(float(w) / contentWidth, float(h) / contentHeight);
+        int dw = std::lround(contentWidth * scale), dh = std::lround(contentHeight * scale);
         int dx = (w - dw) / 2, dy = (h - dh) / 2;
         glDisable(GL_SCISSOR_TEST);
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -579,8 +583,15 @@ int16_t input(unsigned port, unsigned device, unsigned index, unsigned id) {
         if (id == RETRO_DEVICE_ID_JOYPAD_MASK) return int16_t(bits);
         return id < 16 && (bits & (1u << id)) ? 1 : 0;
     }
-    if (device == RETRO_DEVICE_ANALOG && index < 2 && id < 2) {
-        int16_t value = axes[index * 2 + id];
+    if (device == RETRO_DEVICE_ANALOG) {
+        int16_t value;
+        if (index < 2 && id < 2)
+            value = axes[index * 2 + id];
+        else if (index == RETRO_DEVICE_INDEX_ANALOG_BUTTON &&
+                 (id == RETRO_DEVICE_ID_JOYPAD_L2 || id == RETRO_DEVICE_ID_JOYPAD_R2))
+            value = triggers[id == RETRO_DEVICE_ID_JOYPAD_R2];
+        else
+            return 0;
         analogPolls++;
         analogPeak = std::max(analogPeak.load(), uint64_t(std::abs(int(value))));
         return value;
@@ -597,6 +608,7 @@ void releaseInput() {
     buttons = hats = triggerButtons = 0;
     pointerDown = false;
     for (auto& axis : axes) axis = 0;
+    for (auto& trigger : triggers) trigger = 0;
 }
 
 bool rumble(unsigned port, retro_rumble_effect effect, uint16_t strength) {
@@ -777,6 +789,7 @@ bool environment(unsigned command, void* data) {
             }
             width = geometry->base_width;
             height = geometry->base_height;
+            if (coreName == "dolphin-emu") displayAspect = geometry->aspect_ratio;
             if (!useVulkan && context != EGL_NO_CONTEXT) allocateFramebuffer();
             return true;
         }
@@ -1302,7 +1315,7 @@ void run(const Launch launch) {
         api.set_input_state(input);
         api.init();
         initialized = true;
-        api.set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
+        if (coreName != "dolphin-emu") api.set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
         if (launch.probe) {
             status(coreName + " " + coreVersion + " initialized; no ROM loaded");
         } else {
@@ -1340,6 +1353,7 @@ void run(const Launch launch) {
                 detail = lastCoreMessage;
             }
             require(loaded, detail.empty() ? coreName + " could not load this game." : detail);
+            if (coreName == "dolphin-emu") api.set_controller_port_device(0, RETRO_DEVICE_JOYPAD);
             // PCSX resets its controller types while loading content.
             if (coreName == "PCSX-ReARMed")
                 api.set_controller_port_device(0, RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 1));
@@ -1349,6 +1363,7 @@ void run(const Launch launch) {
             api.get_system_av_info(&av);
             width = av.geometry.base_width;
             height = av.geometry.base_height;
+            displayAspect = coreName == "dolphin-emu" ? av.geometry.aspect_ratio : 0;
             if (useVulkan) {
                 vulkan.setup(vkNegotiation);
                 updateWindows();
@@ -1588,6 +1603,8 @@ Java_io_github_landern_miel_CoreHost_axes(JNIEnv*, jclass, jfloat x, jfloat y, j
     inputEvents++;
     triggerButtons = (left > .5f ? 1u << RETRO_DEVICE_ID_JOYPAD_L2 : 0) |
                      (right > .5f ? 1u << RETRO_DEVICE_ID_JOYPAD_R2 : 0);
+    triggers[0] = int16_t(std::clamp(left, 0.f, 1.f) * 32767);
+    triggers[1] = int16_t(std::clamp(right, 0.f, 1.f) * 32767);
 }
 
 extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_touch(JNIEnv*, jclass,

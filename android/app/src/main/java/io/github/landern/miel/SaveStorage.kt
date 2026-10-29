@@ -32,6 +32,10 @@ object SaveStorage {
     fun memoryStick(filename: String): File =
         folder("saves/PPSSPP/${filename.substringBeforeLast('.')}")
 
+    /** A game's Dolphin user data, including its GameCube memory cards. */
+    fun gameCube(filename: String): File =
+        folder("saves/Dolphin/${filename.substringBeforeLast('.')}")
+
     /** Where a game downloaded from RomM for `platform` is kept, with its folder created. */
     fun download(platform: String, filename: String): File =
         folder("roms/$platform").resolve(filename)
