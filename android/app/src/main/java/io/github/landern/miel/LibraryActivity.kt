@@ -46,7 +46,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 
 /**
@@ -281,14 +280,6 @@ class LibraryActivity : ComponentActivity() {
                     }
                 else -> {}
             }
-        }
-        if (
-            session.menu &&
-                !session.confirm &&
-                (command == Command.UploadRom || command == Command.PreviousTab)
-        ) {
-            session.game?.takeIf { it.deletable && it.rommId == 0 }?.let(::uploadRom)
-            return
         }
         if (
             session.menu &&
@@ -621,45 +612,6 @@ class LibraryActivity : ComponentActivity() {
                     "Licenses",
                     assets.open("notices/overview.txt").bufferedReader().use { it.readText() },
                 )
-        }
-    }
-
-    private fun uploadRom(game: Game) {
-        if (!romm.paired) {
-            overlay = Overlay.RomMAddress()
-            return
-        }
-        session.command(Command.B)
-        showMessage("Uploading to RomM", "${game.title} · 0%")
-        work = lifecycleScope.launch {
-            try {
-                runInterruptible(Dispatchers.IO) {
-                    var last = -1
-                    romm.upload(game) { progress ->
-                        val percent = (progress * 100).toInt()
-                        if (percent != last) {
-                            last = percent
-                            runOnUiThread {
-                                if (work?.isActive == true)
-                                    overlay =
-                                        Overlay.Message(
-                                            "Uploading to RomM",
-                                            "${game.title} · $percent%",
-                                        )
-                            }
-                        }
-                    }
-                }
-                showMessage("Uploaded to RomM", "Scan the library in RomM, then rescan in miel.")
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                val message =
-                    if (error is RomM.Refused && error.status == 403)
-                        "RomM upload permission is missing. Pair with RomM again."
-                    else error.message ?: "The upload failed."
-                showMessage("Upload to RomM", message)
-            }
         }
     }
 

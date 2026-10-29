@@ -53,7 +53,7 @@ sealed interface Command {
 
     object Down : Command
 
-    /** L: the previous tab; in More, Upload to RomM. */
+    /** L: the previous tab. */
     object PreviousTab : Command
 
     /** R: the next tab; in More, Delete ROM. */
@@ -67,8 +67,6 @@ sealed interface Command {
     object X : Command
 
     object Y : Command
-
-    object UploadRom : Command
 
     object DeleteRom : Command
 
@@ -223,7 +221,6 @@ class Session(private val path: File) {
             val game = game ?: return@buildList
             add(Command.Favorite)
             if (game.core != null) add(Command.Y)
-            if (game.deletable && game.rommId == 0) add(Command.UploadRom)
             add(Command.A)
             if (game.deletable) add(Command.DeleteRom)
         }

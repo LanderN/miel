@@ -982,7 +982,6 @@ private fun More(session: Session, command: (Command) -> Unit) {
                                 if (session.favorite) "Remove from Favorites"
                                 else "Add to Favorites"
                             Command.Y -> "Emulator settings"
-                            Command.UploadRom -> "Upload to RomM"
                             Command.DeleteRom -> "Delete ROM"
                             else -> "Start fresh"
                         }
