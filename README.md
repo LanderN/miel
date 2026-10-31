@@ -19,19 +19,20 @@ Demo library with homebrew artwork, captured in the emulator. [Game and artwork 
 
 ## Your games, in one place
 
-- **Nine systems.** Play Nintendo 3DS, Nintendo DS, Game Boy Advance, Game Boy Color, Game Boy,
-  NES, SNES, PlayStation and PSP games without choosing an emulator for each one.
+- **Ten systems.** Play Nintendo 3DS, Nintendo DS, Game Boy Advance, Game Boy Color, Game Boy,
+  NES, SNES, PlayStation, PSP and GameCube games without choosing an emulator for each one.
 - **A library for two screens.** Browse covers on the upper screen, with artwork and game details
   below. Choose a single row of portrait covers or two rows of square tiles.
 - **Continue where you stopped.** Returning to the library keeps your place. Recent puts the games
-  you last played within reach, without managing save-state slots. Favorites keeps the ones you
-  pick, and each game shows its play time.
+  you last played within reach. Keep an **Auto save** alongside **five manual save slots** per game.
+  Favorites keeps the games you pick, and each game shows its play time.
 - **The lower screen while you play.** Games on one screen show their art, play time, the time and
-  battery below, with fast-forward and a way back to the library. On DS and 3DS, **Back** brings
+  battery below, with fast-forward, save states and a way back to the library. On DS and 3DS, **Back** brings
   it up over the game.
 - **Local files or RomM.** Choose a ROM folder, connect your self-hosted [RomM](https://romm.app)
   library, or use both. RomM games download the first time you play; in-game saves sync before
   launch and upload when you return to the library. If both copies changed, choose which to keep.
+  **Remove download** frees device space while keeping your saves and the server copy.
 - **Automatic metadata and artwork.** RomM supplies game titles, release years and genres.
   miel downloads matching covers and screenshots from Libretro when artwork is missing.
 - **Controller or touch.** Browse, launch and change settings with the Thor's controls. Touch works
@@ -43,8 +44,9 @@ miel embeds [Azahar](https://azahar-emu.org) for 3DS,
 [mGBA](https://mgba.io) for Game Boy, Game Boy Color and Game Boy Advance,
 [FCEUmm](https://github.com/libretro/libretro-fceumm) for NES,
 [bsnes](https://github.com/libretro/bsnes-libretro) for SNES,
-[PCSX-ReARMed](https://github.com/libretro/pcsx_rearmed) for PlayStation, and
-[PPSSPP](https://www.ppsspp.org/) for PSP.
+[PCSX-ReARMed](https://github.com/libretro/pcsx_rearmed) for PlayStation,
+[PPSSPP](https://www.ppsspp.org/) for PSP, and
+[Dolphin](https://dolphin-emu.org/) for GameCube.
 
 ## Choose your layout
 
@@ -53,7 +55,9 @@ miel embeds [Azahar](https://azahar-emu.org) for 3DS,
 | ![Single-row homebrew library](assets/showcase/library.png) | ![Two-row homebrew library](assets/showcase/grid.png) |
 
 <details>
-<summary>Settings, with controller and touch controls</summary>
+<summary>Game actions and emulator settings</summary>
+
+<img src="assets/showcase/more.png" width="620" alt="Game actions with Favorites, Emulator settings, Start fresh and Delete ROM buttons">
 
 <img src="assets/showcase/settings.png" width="620" alt="miel settings with grouped options, a game layout selector, and A and B controller actions">
 
@@ -62,6 +66,8 @@ miel embeds [Azahar](https://azahar-emu.org) for 3DS,
 </details>
 
 ## Get started
+
+Download the APK from the [latest release](https://github.com/LanderN/miel/releases/latest) and install it on your Thor.
 
 1. Open **Settings** with **Select** or the gear.
 2. Choose a **ROM folder**, pair **RomM**, or both.
@@ -96,12 +102,26 @@ and **Library** saves your place and returns. **Fast-forward settings** there se
 controller button that fast-forwards while held or toggles it, the maximum speed, and whether the
 game's sound plays along.
 
+Open **Save states** on the lower screen to load **Auto save** or save and load any of the five manual
+slots. **A** loads the selected slot; **X** saves to a manual slot. Loading a state returns directly
+to the game. Auto save stays separate from the manual slots.
+
+<details>
+<summary>Save states on the lower screen</summary>
+
+<img src="assets/showcase/save-states.png" width="480" alt="Save-state menu with a separate Auto save slot, manual slots, timestamps and controller actions">
+
+</details>
+
 PSP games run on the upper screen with 2× rendering resolution by default and left-stick controls.
 Keep ISO, CSO, PBP, CHD, ELF or PRX files in a `PSP` or `PlayStation Portable` folder;
 ZIP archives containing a game also work. PPSSPP's runtime assets are bundled; no BIOS is needed.
 In-game saves live under `/sdcard/miel/saves/PPSSPP/<game>/PSP/SAVEDATA/`.
 Home and Back save a checkpoint for automatic resume. RomM syncs each game’s in-game saves
 as a ZIP containing its `PSP/SAVEDATA` folder.
+
+GameCube games run through Dolphin. Keep ISO, GCM, RVZ, GCZ, WIA, CISO, DOL or ELF files in a
+`GameCube` folder. Emulator settings include resolution, aspect ratio and widescreen options.
 
 ## PC games with DroidDeck
 
@@ -138,7 +158,7 @@ Drag the tiles horizontally to scroll. Tap a game to select it, then tap it agai
 
 During a game, **Home** saves your place and returns to the library. Android's **Back** does the
 same on one-screen systems; on DS and 3DS it pauses the game and shows the lower-screen panel, with
-fast-forward and **Library**. Press **Back** or **B**, or tap **Resume**, to keep playing.
+fast-forward, save states and **Library**. Press **Back** or **B**, or tap **Resume**, to keep playing.
 
 ## Azahar improvements
 
@@ -159,7 +179,8 @@ integration for miel's libretro core. See the [attribution](third_party/azahar/N
 ## License
 
 miel's own code is licensed under [GPL-3.0-or-later](LICENSE). Third-party cores, libraries,
-fonts and showcase media retain their individual licenses. Binary releases include a
+fonts, icons and showcase media retain their individual licenses. Platform icons use RetroArch XMB
+Monochrome (CC BY 4.0); action icons use Lucide (ISC). Binary releases include a
 `miel-source.tar.gz` archive containing build scripts, patches, core source archives and fetched
 core dependencies. License information is available in **Settings → Licenses** and under
 `assets/notices/` inside the APK.
