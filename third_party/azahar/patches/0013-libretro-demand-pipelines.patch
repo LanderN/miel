@@ -1,0 +1,16 @@
+--- a/src/video_core/renderer_vulkan/vk_shader_disk_cache.cpp
++++ b/src/video_core/renderer_vulkan/vk_shader_disk_cache.cpp
+@@ -1456,9 +1456,11 @@
+                 parent.instance, parent.renderpass_cache, info, *parent.driver_pipeline_cache,
+                 *parent.pipeline_layout, shaders, &parent.pipeline_workers);
+ 
++#ifndef HAVE_LIBRETRO
+             it_pl.value()->TryBuild(false);
+-
+-            LOG_DEBUG(Render_Vulkan, "    built.");
++#endif
++
++            LOG_DEBUG(Render_Vulkan, "    loaded.");
+ 
+         } else {
+             MALFORMED_DISK_CACHE;
