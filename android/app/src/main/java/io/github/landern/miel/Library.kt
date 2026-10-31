@@ -112,7 +112,7 @@ internal object Miel {
     val inset = 12.dp
     val gap = 16.dp
     val margin = 24.dp
-    val button = Color(0xFFF7EFDF)
+    val button = Color(0xFFFAF4E8)
     val control = 44.dp
     val radius = 26.dp
     val tileRadius = 18.dp
