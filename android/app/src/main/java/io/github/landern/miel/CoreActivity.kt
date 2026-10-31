@@ -788,6 +788,7 @@ class CoreActivity : ComponentActivity() {
 
     private fun updateStates(info: JSONObject) {
         val completed = info.optLong("stateOperation")
+        val loaded = completed > stateOperation && info.optString("stateResult") == "loaded"
         if (completed > stateOperation) {
             stateOperation = completed
             val slot = info.optInt("stateSlot")
@@ -809,6 +810,10 @@ class CoreActivity : ComponentActivity() {
                 )
             }
         playControls.updateStates(slots, info.optBoolean("stateBusy"), stateMessage)
+        if (loaded) {
+            playControls.close()
+            if (popup) showPopup(false)
+        }
     }
 
     /** Writes `frame` to EXTRA_FRAME, replacing the previous checkpoint's. */
