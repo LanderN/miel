@@ -870,7 +870,13 @@ bool readState(const std::string& path, std::vector<uint8_t>* payload = nullptr)
     uint64_t count = 0, expected = 0;
     input.read(stored.data(), length);
     input.read(reinterpret_cast<char*>(&count), 8);
-    if (!input || stored != identity() || !count || count > kMaxStateSize) return false;
+    // Accept app release labels only for their pinned Azahar version.
+    const std::string legacy[] = {"Azahar\nv0.1.0", "Azahar\nv0.2.0", "Azahar\nv0.2.4",
+                                  "Azahar\nv0.3.0", "Azahar\nv0.4.0", "Azahar\nv0.4.1"};
+    bool compatible = stored == identity() ||
+                      (coreName == "Azahar" && coreVersion == "2126.2" &&
+                       std::find(std::begin(legacy), std::end(legacy), stored) != std::end(legacy));
+    if (!input || !compatible || !count || count > kMaxStateSize) return false;
     input.read(reinterpret_cast<char*>(&expected), 8);
     if (payload) payload->resize(count);
     uint64_t actual = kFnvOffset, offset = 0;

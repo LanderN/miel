@@ -1,0 +1,11 @@
+--- a/CMakeModules/GenerateBuildInfo.cmake
++++ b/CMakeModules/GenerateBuildInfo.cmake
+@@ -14,6 +14,8 @@
+     if (EXISTS "${CMAKE_SOURCE_DIR}/GIT-COMMIT" AND EXISTS "${CMAKE_SOURCE_DIR}/GIT-TAG")
+         file(READ "${CMAKE_SOURCE_DIR}/GIT-COMMIT" GIT_REV_RAW LIMIT 64)
+         string(STRIP "${GIT_REV_RAW}" GIT_REV)
++        file(READ "${CMAKE_SOURCE_DIR}/GIT-TAG" GIT_TAG)
++        string(STRIP "${GIT_TAG}" GIT_TAG)
+         string(SUBSTRING "${GIT_REV_RAW}" 0 9 GIT_DESC)
+         set(GIT_BRANCH "HEAD")
+     elseif (EXISTS "${CMAKE_SOURCE_DIR}/.git/objects")
