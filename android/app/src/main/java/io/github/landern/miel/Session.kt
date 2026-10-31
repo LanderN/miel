@@ -341,10 +341,6 @@ class Session(private val path: File) {
         return slot to order.slice(range)
     }
 
-    /** Columns per page of the games grid: as many as the games fill, from two to four. */
-    val gameColumns: Int
-        get() = ((order.size + gameRows - 1) / gameRows).coerceIn(2, GAME_COLUMNS)
-
     val gameRows: Int
         get() = disk.gameRows
 

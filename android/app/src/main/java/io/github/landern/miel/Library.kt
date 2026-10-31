@@ -344,8 +344,8 @@ private class Cell(val index: Int, val slot: Int, val id: String)
 
 /**
  * A scrolling grid that fills `rows` per column, with the selection at `slot`. A single row is
- * centred vertically; multiple rows align at the bottom. The next column peeks past the right
- * gutter. `aspect` is the width over height every tile shares, or null to fill the rows.
+ * centred vertically; multiple rows align at the bottom. `aspect` is the width over height every
+ * tile shares, or null to fill the rows.
  */
 @Composable
 private fun ColumnScope.TileGrid(
@@ -356,29 +356,28 @@ private fun ColumnScope.TileGrid(
     total: Int,
     gap: Dp,
     aspect: Float?,
-    above: (@Composable (Int) -> Unit)? = null,
     below: (@Composable (Int) -> Unit)? = null,
     tile: @Composable (index: Int, chosen: Boolean, height: Dp) -> Unit,
 ) {
     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().heightIn(min = 100.dp)) {
-        val paged = total > columns * rows
+        val paged = aspect == null && total > columns * rows
         val columnWidth =
             (maxWidth - gap * (if (paged) columns else columns - 1)) /
                 (columns + if (paged) 0.3f else 0f)
         val density = LocalDensity.current
         val fontScale = density.fontScale.coerceAtLeast(1f)
-        val aboveHeight = if (above != null) 24.dp * fontScale + 8.dp else 0.dp
+        val topInset = if (aspect != null) Miel.gap else 0.dp
         val belowHeight = if (below != null) 72.dp * fontScale else 0.dp
-        val availableHeight = (maxHeight - aboveHeight - belowHeight).coerceAtLeast(1.dp)
+        val availableHeight = (maxHeight - topInset - belowHeight).coerceAtLeast(1.dp)
         val rowHeight = (availableHeight - gap * (rows - 1)) / rows
         val cellWidth = aspect?.let { minOf(columnWidth, rowHeight * it) } ?: columnWidth
         val cellHeight =
             aspect?.let { minOf(rowHeight, cellWidth / it.coerceAtLeast(0.1f)) } ?: rowHeight
         val remaining = maxHeight - cellHeight * rows - gap * (rows - 1)
         val top = if (rows == 1) remaining / 2 else remaining
-        val stride = with(density) { (cellWidth + gap).toPx() }
+        val stride = with(density) { (columnWidth + gap).toPx() }
         val viewport = with(density) { maxWidth.toPx() }
-        val tileWidth = with(density) { cellWidth.toPx() }
+        val tileWidth = with(density) { columnWidth.toPx() }
         val maxScroll =
             (((total + rows - 1) / rows - 1) * stride + tileWidth - viewport).coerceAtLeast(0f)
         var scroll by remember(rows, total) { mutableFloatStateOf(0f) }
@@ -394,9 +393,9 @@ private fun ColumnScope.TileGrid(
             scroll = scroll.coerceIn(0f, maxScroll)
         }
         val scrollDp = with(density) { scroll.toDp() }
-        fun x(slot: Int) = (cellWidth + gap) * (slot / rows)
+        fun x(slot: Int) = (columnWidth + gap) * (slot / rows) + (columnWidth - cellWidth) / 2
         fun y(slot: Int) =
-            if (rows == 1) aboveHeight + (availableHeight - cellHeight) / 2
+            if (rows == 1) topInset + (availableHeight - cellHeight) / 2
             else top + (cellHeight + gap) * (slot % rows)
         Box(
             Modifier.fillMaxSize()
@@ -414,14 +413,6 @@ private fun ColumnScope.TileGrid(
             }
             for (cell in visible) {
                 key(cell.id) {
-                    if (above != null) {
-                        Box(
-                            Modifier.offset(x(cell.slot) - scrollDp, y(cell.slot) - aboveHeight)
-                                .size(cellWidth, aboveHeight),
-                        ) {
-                            above(cell.index)
-                        }
-                    }
                     Box(
                         Modifier.offset(x(cell.slot) - scrollDp, y(cell.slot))
                             .zIndex(if (cell.slot == slot) 1f else 0f)
@@ -445,7 +436,7 @@ private fun ColumnScope.TileGrid(
 
 @Composable
 private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) -> Unit) {
-    val columns = session.gameColumns
+    val columns = GAME_COLUMNS
     val page = session.order
     val slot = session.position
     TileGrid(
@@ -456,25 +447,12 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
         session.order.size,
         Miel.gap,
         if (session.gameRows == 1) 3f / 4f else 1f,
-        above =
-            if (session.gameRows == 1)
-                { index ->
-                    // Platform tabs name the platform already; the space stays so rows don't shift.
-                    if (session.tab == Tab.RECENT || session.tab == Tab.FAVORITES)
-                        Text(
-                            session.games[index].platform,
-                            color = Miel.muted,
-                            size = Miel.textSmall,
-                            lines = 1,
-                        )
-                }
-            else null,
         below =
             if (session.gameRows == 1)
                 { index ->
                     val game = session.games[index]
                     Column(
-                        Modifier.padding(top = Miel.spaceSm),
+                        Modifier.padding(top = Miel.inset),
                         verticalArrangement = Arrangement.spacedBy(Miel.spaceXs),
                     ) {
                         Text(
@@ -484,10 +462,17 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
                             weight = FontWeight.ExtraBold,
                             lineHeight = 18.sp,
                             lines = 2,
-                            minLines = 2,
                         )
                         val detail =
-                            listOf(if (game.year > 0) "${game.year}" else "", game.genre)
+                            listOf(
+                                    if (session.tab == Tab.RECENT || session.tab == Tab.FAVORITES)
+                                        Tab.entries
+                                            .firstOrNull { it.platform == game.platform }
+                                            ?.label ?: game.platform
+                                    else "",
+                                    if (game.year > 0) "${game.year}" else "",
+                                    game.genre,
+                                )
                                 .filter { it.isNotEmpty() }
                                 .joinToString(" · ")
                         if (detail.isNotEmpty())

@@ -145,7 +145,7 @@ class SessionTest {
         s.run(Command.Pick(4))
         s.setGameRows(1)
         assertEquals("changing layout keeps the selected game", 4, s.selected)
-        assertEquals(0 to listOf(4, 5, 6, 7), s.page(s.gameColumns))
+        assertEquals(0 to listOf(4, 5, 6, 7), s.page(GAME_COLUMNS))
         s.run(Command.Up, Command.Down)
         assertEquals(4, s.selected)
         s.run(Command.Right)
@@ -155,7 +155,7 @@ class SessionTest {
         assertEquals(1, s.gameRows)
         s.setGameRows(2)
         assertEquals(5, s.selected)
-        assertEquals(5 to (0..7).toList(), s.page(s.gameColumns))
+        assertEquals(5 to (0..7).toList(), s.page(GAME_COLUMNS))
         assertEquals(2, open().gameRows)
     }
 
@@ -182,7 +182,7 @@ class SessionTest {
         assertEquals(Tab.NDS, s.tab)
         assertEquals(listOf(4), s.order)
         s.run(Command.ChooseTab(Tab.GB))
-        assertEquals(listOf(0), s.page(s.gameColumns).second)
+        assertEquals(listOf(0), s.page(GAME_COLUMNS).second)
         s.run(Command.NextTab, Command.NextTab)
         assertEquals(Tab.RECENT, s.tab)
         s.run(Command.PreviousTab)
