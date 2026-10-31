@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -60,7 +61,7 @@ internal fun LibraryNavigation(
         modifier
             .height(itemSize + 12.dp)
             .background(Miel.background, RoundedCornerShape(24.dp))
-            .padding(6.dp)
+            .padding(horizontal = 6.dp, vertical = 4.dp)
             .horizontalScroll(scroll)
             .padding(horizontal = edge),
         horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
@@ -68,7 +69,7 @@ internal fun LibraryNavigation(
         tabs.forEach { tab ->
             val active = tab == current
             Pressable(
-                Modifier.size(itemSize).semantics {
+                Modifier.size(width = itemSize, height = itemSize + 4.dp).semantics {
                     selected = active
                     contentDescription = tab.platform ?: tab.label
                     role = Role.Tab
@@ -86,7 +87,7 @@ internal fun LibraryNavigation(
                         tween(180, easing = Miel.easeOut),
                     )
                 Column(
-                    Modifier.fillMaxSize().controlSurface(RoundedCornerShape(15.dp), face, pressed),
+                    Modifier.fillMaxSize().controlSurface(CircleShape, face, pressed),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
                 ) {
