@@ -1,0 +1,25 @@
+RetroArch XMB Monochrome icons
+By the Libretro / RetroArch contributors
+Source: https://github.com/libretro/retroarch-assets
+Revision: d9f969054dc7fbb6fa89519036d2b971e0855b51
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+Full license and warranty disclaimer: retroarch-monochrome-license.txt
+
+The bundled PNG files are unmodified upstream exports. Miel scales them for
+navigation and applies a brown tint when rendering.
+
+Miel resource -> upstream path at the revision above:
+miel_nav_n3ds.png -> xmb/monochrome/png/Nintendo - Nintendo 3DS.png
+miel_nav_nds.png -> xmb/monochrome/png/Nintendo - Nintendo DS.png
+miel_nav_gba.png -> xmb/monochrome/png/Nintendo - Game Boy Advance.png
+miel_nav_gbc.png -> xmb/monochrome/png/Nintendo - Game Boy Color.png
+miel_nav_gb.png -> xmb/monochrome/png/Nintendo - Game Boy.png
+miel_nav_nes.png -> xmb/monochrome/png/Nintendo - Nintendo Entertainment System.png
+miel_nav_snes.png -> xmb/monochrome/png/Nintendo - Super Nintendo Entertainment System.png
+miel_nav_psx.png -> xmb/monochrome/png/Sony - PlayStation.png
+miel_nav_psp.png -> xmb/monochrome/png/Sony - PlayStation Portable.png
+miel_nav_gamecube.png -> xmb/monochrome/png/Nintendo - GameCube.png
+miel_nav_pc.png -> xmb/monochrome/png/IBM - PC and Compatibles.png
+miel_nav_recent.png -> xmb/monochrome/png/history.png
+miel_nav_favorites.png -> xmb/monochrome/png/favorites.png

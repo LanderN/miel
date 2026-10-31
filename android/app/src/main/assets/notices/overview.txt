@@ -21,9 +21,16 @@ PCSX-ReARMed — GPL-2.0-or-later
 PPSSPP — GPL-2.0-or-later
 FFmpeg — LGPL-2.1-or-later for the bundled configuration
 libretro API header — MIT
+RetroArch XMB Monochrome icons — CC-BY-4.0
 AndroidX and ZXing — Apache-2.0
 Inconsolata, Roboto and Nunito — SIL Open Font License 1.1
 
 mGBA source is available under MPL-2.0 in the release source archive and at https://github.com/mgba-emu/mgba .
 
-Full core, dependency and font notices are bundled in this APK under assets/notices/. Their individual terms apply; miel's license does not replace them.
+RetroArch XMB Monochrome icons by the Libretro / RetroArch contributors:
+https://github.com/libretro/retroarch-assets
+Licensed under Creative Commons Attribution 4.0 International:
+https://creativecommons.org/licenses/by/4.0/
+Unmodified PNG exports, scaled and tinted brown when displayed.
+
+Full core, dependency, icon and font notices are bundled in this APK under assets/notices/. Their individual terms apply; miel's license does not replace them.
