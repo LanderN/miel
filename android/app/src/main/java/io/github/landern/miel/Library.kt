@@ -214,7 +214,6 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
                 apps -> AppGrid(session, art, command)
                 else -> GameGrid(session, art, command)
             }
-            Box(Modifier.fillMaxWidth().height(1.dp).background(Miel.line))
             Row(
                 Modifier.fillMaxWidth().height(Miel.control),
                 horizontalArrangement = Arrangement.spacedBy(Miel.spaceSm),
@@ -289,7 +288,7 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
 @Composable
 private fun Header(session: Session, command: (Command) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().height(80.dp),
+        Modifier.fillMaxWidth().height(64.dp),
         horizontalArrangement = Arrangement.spacedBy(Miel.gap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -345,7 +344,7 @@ private class Cell(val index: Int, val slot: Int, val id: String)
 
 /**
  * A scrolling grid that fills `rows` per column, with the selection at `slot`. A single row is
- * centred vertically; multiple rows rest on the divider below. The next column peeks past the right
+ * centred vertically; multiple rows align at the bottom. The next column peeks past the right
  * gutter. `aspect` is the width over height every tile shares, or null to fill the rows.
  */
 @Composable
@@ -1127,21 +1126,12 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
                             value = value,
                             gameLayout = core == null && i == 0,
                         )
-                        if (i != indices.last) {
-                            Box(
-                                Modifier.padding(horizontal = Miel.inset)
-                                    .fillMaxWidth()
-                                    .height(1.dp)
-                                    .background(Miel.line),
-                            )
-                        }
                     }
                 }
             }
         }
         if (session.error.isNotEmpty())
             Text(session.error, color = Color(0xFFBC5062), size = Miel.textSmall)
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Miel.line))
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,

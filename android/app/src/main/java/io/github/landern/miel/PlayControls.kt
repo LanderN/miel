@@ -301,14 +301,11 @@ class PlayControls(
                         )
                         Pill("R3", "Change disc", minWidth = 0.dp) { open() }
                     }
-                    Divider()
                 }
                 if (status.showAnalog) {
                     ToggleRow("Analog controls", status.analogEnabled, toggleAnalog)
-                    Divider()
                 }
                 ToggleRow("Fast-forward", status.fastForwarding, toggleFastForward)
-                Divider()
                 Pressable(Modifier.fillMaxWidth(), ::openSettings) { pressed ->
                     Row(
                         Modifier.fillMaxWidth()
@@ -407,16 +404,6 @@ class PlayControls(
         }
     }
 
-    @Composable
-    private fun Divider() {
-        Box(
-            Modifier.padding(horizontal = Miel.inset)
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(Miel.line),
-        )
-    }
-
     /** A full-screen sheet in the library's Settings layout. */
     @Composable
     private fun Sheet(
@@ -436,7 +423,6 @@ class PlayControls(
                     .padding(horizontal = 6.dp, vertical = Miel.spaceSm),
                 content = content,
             )
-            Box(Modifier.fillMaxWidth().height(1.dp).background(Miel.line))
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -524,7 +510,6 @@ class PlayControls(
                             }
                         }
                     }
-                    if (row != FAST_FORWARD_OPTIONS.lastIndex) Divider()
                 }
             }
         }

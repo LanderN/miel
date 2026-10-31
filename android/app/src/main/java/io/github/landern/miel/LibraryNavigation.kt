@@ -25,13 +25,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /** Console silhouettes and collection pictograms in shoulder-button order. */
@@ -44,21 +43,21 @@ internal fun LibraryNavigation(
 ) {
     Row(
         modifier
-            .height(80.dp)
+            .height(64.dp)
             .relief(RoundedCornerShape(24.dp), Miel.pressed, inset = true)
             .padding(6.dp)
             .horizontalScroll(rememberScrollState())
             .padding(horizontal = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        val width = 76.dp * LocalDensity.current.fontScale.coerceAtLeast(1f)
         tabs.forEach { tab ->
             val active = tab == current
             val intoView = remember(tab) { BringIntoViewRequester() }
             LaunchedEffect(active) { if (active) intoView.bringIntoView() }
             Pressable(
-                Modifier.width(width).height(68.dp).bringIntoViewRequester(intoView).semantics {
+                Modifier.width(64.dp).height(52.dp).bringIntoViewRequester(intoView).semantics {
                     selected = active
+                    contentDescription = tab.platform ?: tab.label
                     role = Role.Tab
                 },
                 { picked(tab) },
@@ -88,13 +87,6 @@ internal fun LibraryNavigation(
                         null,
                         Modifier.size(38.dp).graphicsLayer { translationY = lift.dp.toPx() },
                         colorFilter = ColorFilter.tint(if (active) Miel.ink else Miel.softInk),
-                    )
-                    Text(
-                        tab.label,
-                        color = if (active) Miel.ink else Miel.muted,
-                        size = Miel.textSmall,
-                        weight = if (active) FontWeight.ExtraBold else FontWeight.Bold,
-                        lines = 1,
                     )
                 }
             }
