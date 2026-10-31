@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -58,7 +59,7 @@ internal fun LibraryNavigation(
     Row(
         modifier
             .height(itemSize + 12.dp)
-            .relief(RoundedCornerShape(24.dp), Miel.pressed, inset = true)
+            .background(Miel.background, RoundedCornerShape(24.dp))
             .padding(6.dp)
             .horizontalScroll(scroll)
             .padding(horizontal = edge),
@@ -76,7 +77,7 @@ internal fun LibraryNavigation(
             ) { pressed ->
                 val face by
                     animateColorAsState(
-                        if (active || pressed) Miel.selection else Miel.pressed,
+                        if (active) Miel.selection else Miel.button,
                         tween(160, easing = Miel.easeOut),
                     )
                 val lift by
@@ -85,12 +86,7 @@ internal fun LibraryNavigation(
                         tween(180, easing = Miel.easeOut),
                     )
                 Column(
-                    Modifier.fillMaxSize()
-                        .then(
-                            if (active || pressed)
-                                Modifier.controlSurface(RoundedCornerShape(15.dp), face, pressed)
-                            else Modifier,
-                        ),
+                    Modifier.fillMaxSize().controlSurface(RoundedCornerShape(15.dp), face, pressed),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
                 ) {

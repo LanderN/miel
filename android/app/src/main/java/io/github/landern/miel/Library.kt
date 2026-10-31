@@ -62,6 +62,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -72,9 +73,12 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -108,6 +112,7 @@ internal object Miel {
     val inset = 12.dp
     val gap = 16.dp
     val margin = 24.dp
+    val button = Color(0xFFF7EFDF)
     val control = 44.dp
     val radius = 26.dp
     val tileRadius = 18.dp
@@ -304,7 +309,7 @@ private fun Header(session: Session, command: (Command) -> Unit) {
         }
         Pressable(Modifier.size(Miel.control), { command(Command.Select) }) { pressed ->
             Box(
-                Modifier.fillMaxSize().controlSurface(CircleShape, Miel.surface, pressed),
+                Modifier.fillMaxSize().controlSurface(CircleShape, Miel.button, pressed),
                 contentAlignment = Alignment.Center,
             ) {
                 Image(
@@ -738,20 +743,27 @@ internal fun Pressable(
     Box(modifier.clickable(interaction, null, onClick = onClick)) { content(pressed) }
 }
 
-/** A control settles toward its contact shadow on press and returns without overshoot. */
+/** A raised button with a solid lower edge and a face that sinks on press. */
 @Composable
-internal fun Modifier.controlSurface(
-    shape: Shape,
-    face: Color,
-    pressed: Boolean,
-): Modifier {
-    val depth by
-        animateFloatAsState(
-            if (pressed) .3f else 1f,
-            tween(if (pressed) 90 else 160, easing = Miel.easeOut),
-        )
-    return graphicsLayer { translationY = ((1f - depth) * 1.5f).dp.toPx() }
-        .relief(shape, face, height = depth)
+internal fun Modifier.controlSurface(shape: Shape, face: Color, pressed: Boolean): Modifier {
+    val sink by animateDpAsState(if (pressed) 3.dp else 0.dp, tween(110, easing = Miel.easeOut))
+    val edge = lerp(face, Miel.ink, .12f)
+    return dropShadow(shape, Shadow(8.dp, Color(0x26908A7D), offset = DpOffset(0.dp, 3.dp)))
+        .drawWithContent {
+            val lip = 4.dp.toPx()
+            val outline =
+                shape.createOutline(
+                    Size(size.width, (size.height - lip).coerceAtLeast(0f)),
+                    layoutDirection,
+                    this,
+                )
+            translate(top = lip) { drawOutline(outline, edge) }
+            translate(top = sink.toPx()) {
+                drawOutline(outline, face)
+                drawOutline(outline, lerp(face, Miel.ink, .1f), style = Stroke(1.dp.toPx()))
+            }
+            translate(top = sink.toPx() - lip / 2) { this@drawWithContent.drawContent() }
+        }
 }
 
 /** An action face that sinks into its lower edge when pressed. */
@@ -774,64 +786,28 @@ internal fun RowScope.Pill(
                     pressed -> Miel.pressed
                     destructive -> Color(0xFFFBE8EB)
                     primary -> Miel.honey
-                    else -> Miel.surface
+                    else -> Miel.button
                 },
                 tween(120, easing = Miel.easeOut),
             )
         val shape = RoundedCornerShape(Miel.control / 2)
         val size = Modifier.height(Miel.control).widthIn(min = minWidth)
-        val lip = 4.dp
-        val sink by animateDpAsState(if (pressed) 3.dp else 0.dp, tween(110, easing = Miel.easeOut))
-        val edge =
-            when {
-                destructive -> Color(0xFFE5B3BF)
-                primary -> Color(0xFFC7952F)
-                else -> Color(0xFFDED7C6)
-            }
-        Box(if (fill) size.fillMaxWidth() else size, contentAlignment = Alignment.Center) {
-            Box(
-                Modifier.matchParentSize()
-                    .padding(top = lip)
-                    .dropShadow(
-                        shape,
-                        Shadow(
-                            8.dp,
-                            Color(0x26908A7D),
-                            offset = DpOffset(0.dp, 3.dp - sink * .66f),
-                        ),
-                    )
-                    .background(edge, shape),
+        Row(
+            (if (fill) size.fillMaxWidth() else size)
+                .controlSurface(shape, face, pressed)
+                .padding(horizontal = Miel.gap),
+            horizontalArrangement =
+                Arrangement.spacedBy(Miel.spaceSm, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (key != null) ControllerBadge(key, Modifier.size(24.dp), face)
+            Text(
+                label,
+                color = if (destructive) Miel.rose else Miel.ink,
+                size = Miel.textBody,
+                weight = FontWeight.Bold,
+                lines = 1,
             )
-            Box(
-                Modifier.matchParentSize()
-                    .padding(bottom = lip)
-                    .offset(y = sink)
-                    .background(face, shape)
-                    .border(
-                        1.dp,
-                        when {
-                            destructive -> Color(0xFFEDC6CF)
-                            primary -> Color(0xFFDDB047)
-                            else -> Color(0xFFE6DFCF)
-                        },
-                        shape,
-                    ),
-            )
-            Row(
-                Modifier.fillMaxHeight().offset(y = sink - lip / 2).padding(horizontal = Miel.gap),
-                horizontalArrangement =
-                    Arrangement.spacedBy(Miel.spaceSm, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (key != null) ControllerBadge(key, Modifier.size(24.dp), face)
-                Text(
-                    label,
-                    color = if (destructive) Color(0xFF9A455A) else Miel.ink,
-                    size = Miel.textBody,
-                    weight = FontWeight.Bold,
-                    lines = 1,
-                )
-            }
         }
     }
 }
@@ -867,23 +843,13 @@ internal fun Segmented(
                         when {
                             i == current -> Miel.honey
                             pressed -> Miel.pressed
-                            else -> Miel.surface
+                            else -> Miel.button
                         },
                         tween(140, easing = Miel.easeOut),
                     )
                 Box(
                     Modifier.fillMaxSize()
-                        .then(
-                            if (i == current)
-                                Modifier.controlSurface(
-                                    RoundedCornerShape(15.dp),
-                                    background,
-                                    pressed,
-                                )
-                            else if (pressed)
-                                Modifier.relief(RoundedCornerShape(15.dp), background, inset = true)
-                            else Modifier,
-                        ),
+                        .controlSurface(RoundedCornerShape(15.dp), background, pressed),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -955,14 +921,14 @@ internal fun MoreRow(
                     destructive -> Color(0xFFFBE8EB)
                     pressed -> Miel.pressed
                     chosen -> Miel.selection
-                    else -> Miel.surface
+                    else -> Miel.button
                 },
                 tween(140, easing = Miel.easeOut),
             )
         Row(
             Modifier.fillMaxWidth()
                 .heightIn(min = if (icon == null) 56.dp else 48.dp)
-                .relief(shape, face, height = .5f, inset = pressed || (icon == null && chosen))
+                .controlSurface(shape, face, pressed)
                 .padding(horizontal = Miel.inset, vertical = Miel.spaceSm),
             horizontalArrangement = Arrangement.spacedBy(Miel.inset),
             verticalAlignment = Alignment.CenterVertically,
@@ -1130,11 +1096,10 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
                             Box(
                                 Modifier.fillMaxWidth()
                                     .heightIn(min = 64.dp)
-                                    .relief(
+                                    .controlSurface(
                                         shape,
-                                        if (chosen) Miel.selection else Miel.surface,
-                                        height = .5f,
-                                        inset = chosen || pressed,
+                                        if (chosen) Miel.selection else Miel.button,
+                                        pressed,
                                     )
                                     .padding(Miel.inset),
                                 contentAlignment = Alignment.CenterStart,
@@ -1165,6 +1130,7 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
                     Modifier.fillMaxSize()
                         .verticalScroll(scroll)
                         .padding(horizontal = Miel.spaceXs, vertical = Miel.inset),
+                    verticalArrangement = Arrangement.spacedBy(Miel.spaceSm),
                 ) {
                     indices.forEach { i ->
                         val option = options.getOrNull(i)
@@ -1243,22 +1209,14 @@ private fun SettingsOption(
                 when {
                     pressed -> Miel.pressed
                     chosen -> Miel.selection
-                    else -> Miel.surface
+                    else -> Miel.button
                 },
                 tween(140, easing = Miel.easeOut),
             )
         Row(
             Modifier.fillMaxWidth()
                 .heightIn(min = 56.dp)
-                .then(
-                    if (chosen || pressed)
-                        Modifier.relief(
-                            shape,
-                            face,
-                            inset = true,
-                        )
-                    else Modifier,
-                )
+                .controlSurface(shape, face, pressed)
                 .padding(horizontal = Miel.inset, vertical = Miel.spaceXs),
             horizontalArrangement = Arrangement.spacedBy(Miel.inset),
             verticalAlignment = Alignment.CenterVertically,

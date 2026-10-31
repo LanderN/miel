@@ -356,7 +356,8 @@ class PlayControls(
                 Modifier.padding(bottom = Miel.margin)
                     .width(380.dp)
                     .relief(RoundedCornerShape(Miel.radius), Miel.surface, height = 1.4f)
-                    .padding(horizontal = Miel.spaceXs, vertical = Miel.spaceXs),
+                    .padding(Miel.spaceSm),
+                verticalArrangement = Arrangement.spacedBy(Miel.spaceSm),
             ) {
                 if (status.count > 1) {
                     Row(
@@ -379,20 +380,16 @@ class PlayControls(
                 if (status.showAnalog) {
                     ToggleRow("Analog controls", status.analogEnabled, toggleAnalog)
                 }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Miel.spaceSm),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Pressable(Modifier.weight(1f), toggleFastForward) { pressed ->
                         Row(
                             Modifier.fillMaxWidth()
                                 .heightIn(min = 56.dp)
-                                .then(
-                                    if (pressed)
-                                        Modifier.relief(
-                                            RoundedCornerShape(14.dp),
-                                            Miel.pressed,
-                                            inset = true,
-                                        )
-                                    else Modifier,
-                                )
+                                .controlSurface(RoundedCornerShape(14.dp), Miel.button, pressed)
                                 .padding(horizontal = Miel.inset),
                             horizontalArrangement = Arrangement.spacedBy(Miel.inset),
                             verticalAlignment = Alignment.CenterVertically,
@@ -413,15 +410,7 @@ class PlayControls(
                     ) { pressed ->
                         Row(
                             Modifier.heightIn(min = 56.dp)
-                                .then(
-                                    if (pressed)
-                                        Modifier.relief(
-                                            RoundedCornerShape(14.dp),
-                                            Miel.pressed,
-                                            inset = true,
-                                        )
-                                    else Modifier,
-                                )
+                                .controlSurface(RoundedCornerShape(14.dp), Miel.button, pressed)
                                 .padding(horizontal = Miel.inset),
                             horizontalArrangement = Arrangement.spacedBy(Miel.spaceSm),
                             verticalAlignment = Alignment.CenterVertically,
@@ -445,15 +434,7 @@ class PlayControls(
                     Row(
                         Modifier.fillMaxWidth()
                             .heightIn(min = 56.dp)
-                            .then(
-                                if (pressed)
-                                    Modifier.relief(
-                                        RoundedCornerShape(14.dp),
-                                        Miel.pressed,
-                                        inset = true,
-                                    )
-                                else Modifier,
-                            )
+                            .controlSurface(RoundedCornerShape(14.dp), Miel.button, pressed)
                             .padding(horizontal = Miel.inset),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -495,11 +476,7 @@ class PlayControls(
             Row(
                 Modifier.fillMaxWidth()
                     .heightIn(min = 56.dp)
-                    .then(
-                        if (pressed)
-                            Modifier.relief(RoundedCornerShape(14.dp), Miel.pressed, inset = true)
-                        else Modifier,
-                    )
+                    .controlSurface(RoundedCornerShape(14.dp), Miel.button, pressed)
                     .padding(horizontal = Miel.inset),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -653,11 +630,10 @@ class PlayControls(
             Column(
                 Modifier.fillMaxWidth()
                     .heightIn(min = 64.dp)
-                    .relief(
+                    .controlSurface(
                         RoundedCornerShape(14.dp),
-                        if (chosen) Miel.selection else Miel.surface,
-                        height = .5f,
-                        inset = pressed && !stateBusy,
+                        if (chosen) Miel.selection else Miel.button,
+                        pressed && !stateBusy,
                     )
                     .padding(horizontal = Miel.inset, vertical = Miel.spaceSm),
                 verticalArrangement = Arrangement.spacedBy(Miel.spaceXs),
@@ -714,7 +690,8 @@ class PlayControls(
             Column(
                 Modifier.fillMaxWidth()
                     .relief(RoundedCornerShape(Miel.tileRadius), Miel.surface, height = .7f)
-                    .padding(Miel.spaceXs),
+                    .padding(Miel.spaceSm),
+                verticalArrangement = Arrangement.spacedBy(Miel.spaceSm),
             ) {
                 FAST_FORWARD_OPTIONS.forEachIndexed { row, option ->
                     val chosen = row == highlighted
@@ -725,14 +702,10 @@ class PlayControls(
                         Row(
                             Modifier.fillMaxWidth()
                                 .heightIn(min = 60.dp)
-                                .then(
-                                    if (chosen || pressed)
-                                        Modifier.relief(
-                                            RoundedCornerShape(14.dp),
-                                            if (pressed) Miel.pressed else Miel.selection,
-                                            inset = true,
-                                        )
-                                    else Modifier,
+                                .controlSurface(
+                                    RoundedCornerShape(14.dp),
+                                    if (chosen) Miel.selection else Miel.button,
+                                    pressed,
                                 )
                                 .padding(horizontal = Miel.inset, vertical = Miel.spaceSm),
                             horizontalArrangement = Arrangement.spacedBy(Miel.inset),
