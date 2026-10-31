@@ -1,7 +1,9 @@
 package io.github.landern.miel
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.draw.innerShadow
 import androidx.compose.ui.graphics.Brush
@@ -53,4 +55,22 @@ internal fun Modifier.relief(
                 Shadow(1.dp, Color(0x99FFFEF8), offset = DpOffset(-.4.dp, -.6.dp)),
             )
     else surface
+}
+
+/** Fades partially visible rows into the surrounding surface at scrolling edges. */
+internal fun Modifier.scrollFades(scroll: ScrollState, face: Color): Modifier = drawWithContent {
+    drawContent()
+    val fade = Miel.inset.toPx()
+    if (scroll.canScrollBackward) {
+        drawRect(Brush.verticalGradient(listOf(face, face.copy(alpha = 0f)), endY = fade))
+    }
+    if (scroll.canScrollForward) {
+        drawRect(
+            Brush.verticalGradient(
+                listOf(face.copy(alpha = 0f), face),
+                startY = size.height - fade,
+                endY = size.height,
+            ),
+        )
+    }
 }

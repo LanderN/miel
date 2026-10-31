@@ -34,3 +34,8 @@ https://creativecommons.org/licenses/by/4.0/
 Unmodified PNG exports, scaled and tinted brown when displayed.
 
 Full core, dependency, icon and font notices are bundled in this APK under assets/notices/. Their individual terms apply; miel's license does not replace them.
+
+Lucide action icons
+Lucide Contributors and Cole Bemis · ISC license
+https://lucide.dev
+See lucide-notice.txt and lucide-license.txt.

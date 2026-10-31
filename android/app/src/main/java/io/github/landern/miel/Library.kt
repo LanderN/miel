@@ -50,6 +50,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,6 +60,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -73,6 +75,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
@@ -87,6 +90,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -675,7 +679,7 @@ private fun Tile(
         )
     val rise by
         animateDpAsState(
-            if (chosen && !pressed) (-6).dp else 0.dp,
+            if (chosen && !pressed) (-8).dp else 0.dp,
             spring(dampingRatio = 1f, stiffness = 450f),
         )
     Box(
@@ -689,10 +693,11 @@ private fun Tile(
             .clip(shape)
             .background(background)
             .border(
-                if (chosen) 3.dp else if (border) 1.dp else 2.dp,
-                if (chosen) Miel.cream else Miel.line,
+                if (chosen) 2.dp else if (border) 1.dp else 2.dp,
+                if (chosen) Miel.ink else Miel.line,
                 shape,
             )
+            .then(if (chosen) Modifier.border(5.dp, Miel.cream, shape) else Modifier)
             .semantics { selected = chosen }
             .clickable(interaction, null, onClick = onClick),
     ) {
@@ -892,14 +897,27 @@ private fun Dialog(
     }
 }
 
-/** One action in More, with the selection inset. */
+/** An action row; icon actions use individual raised faces. */
 @Composable
-internal fun MoreRow(label: String, chosen: Boolean, destructive: Boolean, onClick: () -> Unit) {
+internal fun MoreRow(
+    label: String,
+    chosen: Boolean,
+    destructive: Boolean,
+    icon: Int? = null,
+    onClick: () -> Unit,
+) {
     val shape = RoundedCornerShape(14.dp)
-    Pressable(Modifier.fillMaxWidth().semantics { selected = chosen }, onClick) { pressed ->
+    val intoView = remember { BringIntoViewRequester() }
+    LaunchedEffect(chosen) { if (chosen) intoView.bringIntoView() }
+    Pressable(
+        Modifier.fillMaxWidth().bringIntoViewRequester(intoView).semantics { selected = chosen },
+        onClick,
+    ) { pressed ->
         val face by
             animateColorAsState(
                 when {
+                    destructive && chosen -> Color(0xFFF3D3DB)
+                    destructive -> Color(0xFFFBE8EB)
                     pressed -> Miel.pressed
                     chosen -> Miel.selection
                     else -> Miel.surface
@@ -908,19 +926,29 @@ internal fun MoreRow(label: String, chosen: Boolean, destructive: Boolean, onCli
             )
         Row(
             Modifier.fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .relief(shape, face, height = .5f, inset = chosen || pressed)
-                .padding(horizontal = Miel.inset, vertical = Miel.spaceXs),
+                .heightIn(min = if (icon == null) 56.dp else 48.dp)
+                .relief(shape, face, height = .5f, inset = pressed || (icon == null && chosen))
+                .padding(horizontal = Miel.inset, vertical = Miel.spaceSm),
             horizontalArrangement = Arrangement.spacedBy(Miel.inset),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (icon != null) {
+                Image(
+                    painterResource(icon),
+                    null,
+                    Modifier.size(24.dp),
+                    colorFilter = ColorFilter.tint(if (destructive) Miel.rose else Miel.ink),
+                )
+            }
             Text(
                 label,
+                modifier = Modifier.weight(1f),
                 color = if (destructive) Miel.rose else Miel.ink,
                 size = Miel.textBody,
                 weight = FontWeight.SemiBold,
-                lines = 1,
+                lines = if (icon == null) 1 else 2,
             )
+            if (icon != null && chosen) ControllerBadge("A", Modifier.size(24.dp), face)
         }
     }
 }
@@ -947,9 +975,10 @@ private fun More(session: Session, command: (Command) -> Unit) {
         } else {
             Column(
                 Modifier.fillMaxWidth()
-                    .relief(RoundedCornerShape(Miel.tileRadius), Miel.background, inset = true)
+                    .weight(1f, fill = false)
+                    .verticalScroll(remember { ScrollState(0) })
                     .padding(Miel.spaceXs),
-                verticalArrangement = Arrangement.spacedBy(Miel.spaceXs),
+                verticalArrangement = Arrangement.spacedBy(Miel.spaceSm),
             ) {
                 session.moreActions.forEachIndexed { i, action ->
                     val label =
@@ -962,7 +991,15 @@ private fun More(session: Session, command: (Command) -> Unit) {
                                 if (game?.remote == true) "Remove download" else "Delete ROM"
                             else -> "Start fresh"
                         }
-                    MoreRow(label, i == session.moreRow, action == Command.DeleteRom) {
+                    val icon =
+                        when (action) {
+                            Command.Favorite -> R.drawable.miel_action_star
+                            Command.Y -> R.drawable.miel_action_settings
+                            Command.DeleteRom -> R.drawable.miel_action_close
+                            else -> R.drawable.miel_action_reload
+                        }
+                    if (action == Command.DeleteRom) Box(Modifier.height(Miel.spaceXs))
+                    MoreRow(label, i == session.moreRow, action == Command.DeleteRom, icon) {
                         session.moreRow = i
                         command(action)
                     }
@@ -970,14 +1007,9 @@ private fun More(session: Session, command: (Command) -> Unit) {
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Miel.inset)) {
-            Pill("B", "Cancel", primary = false, fill = true) { command(Command.B) }
-            Pill(
-                "A",
-                if (confirm) "Begin again" else "Select",
-                destructive = confirm,
-                fill = true,
-            ) {
-                command(Command.A)
+            Pill("B", "Cancel", primary = false, fill = confirm) { command(Command.B) }
+            if (confirm) {
+                Pill("A", "Begin again", destructive = true, fill = true) { command(Command.A) }
             }
         }
     }
@@ -1083,17 +1115,21 @@ private fun Settings(overlay: Overlay.Settings, session: Session, command: (Comm
                     }
                 }
             }
-            Column(
+            val scroll = remember(core, group) { ScrollState(0) }
+            val trayShape = RoundedCornerShape(Miel.tileRadius)
+            Box(
                 Modifier.weight(1f)
                     .fillMaxHeight()
-                    .verticalScroll(remember(core, group) { ScrollState(0) })
-                    .padding(horizontal = 6.dp, vertical = Miel.spaceSm),
+                    .padding(horizontal = 6.dp, vertical = Miel.spaceSm)
+                    .relief(trayShape, Miel.surface, height = .7f)
+                    .clip(trayShape)
+                    .scrollFades(scroll, Miel.surface),
             ) {
                 val indices = groups[group].second
                 Column(
-                    Modifier.fillMaxWidth()
-                        .relief(RoundedCornerShape(Miel.tileRadius), Miel.surface, height = .7f)
-                        .padding(Miel.spaceXs),
+                    Modifier.fillMaxSize()
+                        .verticalScroll(scroll)
+                        .padding(horizontal = Miel.spaceXs, vertical = Miel.inset),
                 ) {
                     indices.forEach { i ->
                         val option = options.getOrNull(i)
@@ -1151,12 +1187,20 @@ private fun SettingsOption(
     gameLayout: Boolean = false,
 ) {
     val bringIntoView = remember { BringIntoViewRequester() }
-    LaunchedEffect(chosen) { if (chosen) bringIntoView.bringIntoView() }
+    var rowSize by remember { mutableStateOf(IntSize.Zero) }
+    val clearance = with(LocalDensity.current) { Miel.inset.toPx() }
+    LaunchedEffect(chosen, rowSize, clearance) {
+        if (chosen && rowSize.height > 0)
+            bringIntoView.bringIntoView(
+                Rect(0f, -clearance, rowSize.width.toFloat(), rowSize.height + clearance),
+            )
+    }
     val shape = RoundedCornerShape(14.dp)
     Pressable(
-        Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoView).semantics {
-            selected = chosen
-        },
+        Modifier.fillMaxWidth()
+            .onSizeChanged { rowSize = it }
+            .bringIntoViewRequester(bringIntoView)
+            .semantics { selected = chosen },
         { command(Command.Pick(index)) },
     ) { pressed ->
         val face by

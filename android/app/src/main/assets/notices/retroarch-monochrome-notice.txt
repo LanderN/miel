@@ -7,7 +7,7 @@ https://creativecommons.org/licenses/by/4.0/
 Full license and warranty disclaimer: retroarch-monochrome-license.txt
 
 The bundled PNG files are unmodified upstream exports. Miel scales them for
-navigation and applies a brown tint when rendering.
+navigation and actions, and applies the interface tint when rendering.
 
 Miel resource -> upstream path at the revision above:
 miel_nav_n3ds.png -> xmb/monochrome/png/Nintendo - Nintendo 3DS.png

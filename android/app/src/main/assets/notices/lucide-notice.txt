@@ -1,0 +1,8 @@
+Lucide outline icons, version 0.468.0
+https://github.com/lucide-icons/lucide/tree/0.468.0
+Copyright Lucide Contributors and Cole Bemis. ISC license; see lucide-license.txt.
+Converted from SVG to Android VectorDrawable and tinted at runtime.
+miel_action_star.xml: icons/star.svg
+miel_action_settings.xml: icons/settings-2.svg
+miel_action_reload.xml: icons/rotate-ccw.svg
+miel_action_close.xml: icons/trash-2.svg
