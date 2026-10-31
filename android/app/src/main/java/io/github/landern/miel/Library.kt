@@ -38,7 +38,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -290,20 +289,12 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
 @Composable
 private fun Header(session: Session, command: (Command) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().height(Miel.control),
+        Modifier.fillMaxWidth().height(80.dp),
         horizontalArrangement = Arrangement.spacedBy(Miel.gap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val tabs = session.tabs
-        Segmented(
-            tabs.map { it.label },
-            tabs.indexOf(session.tab),
-            optionWidth = 64.dp * LocalDensity.current.fontScale.coerceAtLeast(1f),
-            modifier = Modifier.weight(1f),
-            height = Miel.control,
-            scrollState = rememberScrollState(),
-        ) {
-            command(Command.ChooseTab(tabs[it]))
+        LibraryNavigation(session.tabs, session.tab, Modifier.weight(1f)) {
+            command(Command.ChooseTab(it))
         }
         Pressable(Modifier.size(Miel.control), { command(Command.Select) }) { pressed ->
             Box(
