@@ -41,9 +41,29 @@ class ArtworkCache(
 
     @Volatile private var closed = false
 
-    fun coverPath(id: String): String = paths["${LibretroArt.BOXARTS}:$id"] ?: ""
+    fun coverPath(game: Game): String = cachedPath(game, LibretroArt.BOXARTS)
 
-    fun heroPath(id: String): String = paths["${LibretroArt.SNAPS}:$id"] ?: ""
+    fun heroPath(game: Game): String = cachedPath(game, LibretroArt.SNAPS)
+
+    /** Resolves visible artwork from disk before the background cache pass finishes. */
+    private fun cachedPath(game: Game, kind: String): String {
+        val key = "$kind:${game.id}"
+        return paths[key]
+            ?: findCached(File(context.filesDir, "artwork/libretro-v1"), game, kind)
+                ?.also { paths[key] = it }
+                .orEmpty()
+    }
+
+    private fun findCached(directory: File, game: Game, kind: String): String? =
+        try {
+            val file = image(directory, game.id, kind)
+            val recorded = File(directory, stem(game.id, kind) + ".source.txt")
+            val previous = if (recorded.isFile) recorded.readText() else ""
+            if (previous.startsWith("content:") && previous != sourceFor(game, kind)) null
+            else file.takeIf(::valid)?.absolutePath
+        } catch (_: IOException) {
+            null
+        }
 
     /** CoreActivity's JPEG of `game`'s upper screen at its last checkpoint, per core version. */
     fun frame(game: Game): File? =
@@ -152,13 +172,9 @@ class ArtworkCache(
         for (game in games) {
             if (!current(request)) return
             for (kind in KINDS) {
-                paths.remove("$kind:${game.id}")
-                val file = image(directory, game.id, kind)
-                val recorded = File(directory, stem(game.id, kind) + ".source.txt")
-                val previous = if (recorded.isFile) recorded.readText() else ""
-                val source = sourceFor(game, kind)
-                if (previous.startsWith("content:") && previous != source) continue
-                if (valid(file)) paths["$kind:${game.id}"] = file.absolutePath
+                val key = "$kind:${game.id}"
+                val path = findCached(directory, game, kind)
+                if (path == null) paths.remove(key) else paths[key] = path
             }
         }
     }

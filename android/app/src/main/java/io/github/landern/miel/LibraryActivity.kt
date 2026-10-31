@@ -212,10 +212,10 @@ class LibraryActivity : ComponentActivity() {
 
     private fun cover(game: Game): Cover? {
         artworkVersion
-        image(artwork.coverPath(game.id))?.let {
+        image(artwork.coverPath(game))?.let {
             return Cover(it, boxart = true)
         }
-        return image(artwork.heroPath(game.id))?.let { Cover(it, boxart = false) }
+        return image(artwork.heroPath(game))?.let { Cover(it, boxart = false) }
     }
 
     /** The selected setting, game or app, for the lower screen. */
@@ -239,7 +239,7 @@ class LibraryActivity : ComponentActivity() {
                 Hero(
                     game.title,
                     detail,
-                    frame?.path ?: artwork.heroPath(game.id),
+                    frame?.path ?: artwork.heroPath(game),
                     played = PlayTime.describe(this, game.id),
                 )
             } ?: Hero(if (session.games.isEmpty()) "No games" else "No recent games", "", "")
@@ -1033,7 +1033,7 @@ class LibraryActivity : ComponentActivity() {
                 .putExtra(CoreActivity.EXTRA_ROMM_TOKEN, romm.token)
                 .putExtra(CoreActivity.EXTRA_TITLE, game.title)
                 .putExtra(CoreActivity.EXTRA_GAME_ID, game.id)
-                .putExtra(CoreActivity.EXTRA_ART, artwork.heroPath(game.id))
+                .putExtra(CoreActivity.EXTRA_ART, artwork.heroPath(game))
                 .putExtra(CoreActivity.EXTRA_FRAME, frame.path)
                 .putExtra(CoreActivity.EXTRA_FRESH, fresh)
                 .putExtra(CoreActivity.EXTRA_OPTIONS, session.launchOptions(core))
