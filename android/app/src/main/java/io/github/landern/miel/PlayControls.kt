@@ -355,7 +355,7 @@ class PlayControls(
             Column(
                 Modifier.padding(bottom = Miel.margin)
                     .width(380.dp)
-                    .relief(RoundedCornerShape(Miel.radius), Miel.surface, height = 1.4f)
+                    .relief(RoundedCornerShape(14.dp + Miel.spaceSm), Miel.surface, height = 1.4f)
                     .padding(Miel.spaceSm),
                 verticalArrangement = Arrangement.spacedBy(Miel.spaceSm),
             ) {
@@ -689,7 +689,7 @@ class PlayControls(
         Sheet("Fast-forward", footer = { Pill("B", "Done", primary = false) { close() } }) {
             Column(
                 Modifier.fillMaxWidth()
-                    .relief(RoundedCornerShape(Miel.tileRadius), Miel.surface, height = .7f)
+                    .relief(RoundedCornerShape(14.dp + Miel.spaceSm), Miel.surface, height = .7f)
                     .padding(Miel.spaceSm),
                 verticalArrangement = Arrangement.spacedBy(Miel.spaceSm),
             ) {
