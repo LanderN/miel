@@ -1,7 +1,8 @@
 package io.github.landern.miel
 
-import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
@@ -30,12 +31,16 @@ internal fun ControllerBadge(
 ) {
     val shoulder = key == "L" || key == "R"
     val shape = if (shoulder) RoundedCornerShape(5.dp) else CircleShape
-    val outline = if (face.luminance() < .65f) Miel.ink else Miel.muted
+    val fill = if (face.luminance() < .65f) Miel.surface else Color(0xFFF3EAD5)
     Box(
         modifier =
-            modifier.border(1.2.dp, outline, shape).clearAndSetSemantics {
-                contentDescription = "$key button"
-            },
+            modifier
+                .background(Color(0xFFD8C9A7), shape)
+                .padding(bottom = 2.dp)
+                .background(fill, shape)
+                .clearAndSetSemantics {
+                    contentDescription = "$key button"
+                },
         contentAlignment = Alignment.Center,
     ) {
         BasicText(
@@ -45,7 +50,7 @@ internal fun ControllerBadge(
                     color = Miel.ink,
                     fontFamily = controllerFont,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = if (shoulder) 12.sp else 14.sp,
+                    fontSize = 11.sp,
                     platformStyle = PlatformTextStyle(includeFontPadding = false),
                 ),
             maxLines = 1,
