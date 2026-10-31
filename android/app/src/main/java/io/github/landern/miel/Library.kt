@@ -663,7 +663,7 @@ private fun ColumnScope.AppGrid(session: Session, art: Art, command: (Command) -
     }
 }
 
-/** The selected cover rises out of its mount with a critically damped settle. */
+/** A flat artwork tile with an outlined, gently enlarged selection. */
 @Composable
 private fun Tile(
     chosen: Boolean,
@@ -675,19 +675,9 @@ private fun Tile(
     val shape = RoundedCornerShape(Miel.tileRadius)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val height by
-        animateFloatAsState(
-            if (pressed) .4f else if (chosen) 3.2f else .75f,
-            tween(if (pressed) 90 else 180, easing = Miel.easeOut),
-        )
     val scale by
         animateFloatAsState(
-            if (pressed) .99f else if (chosen) 1.06f else 1f,
-            spring(dampingRatio = 1f, stiffness = 450f),
-        )
-    val rise by
-        animateDpAsState(
-            if (chosen && !pressed) (-8).dp else 0.dp,
+            if (pressed) .99f else if (chosen) 1.03f else 1f,
             spring(dampingRatio = 1f, stiffness = 450f),
         )
     Box(
@@ -695,9 +685,7 @@ private fun Tile(
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-                translationY = rise.toPx()
             }
-            .softShadow(shape, height)
             .clip(shape)
             .background(background)
             .border(
