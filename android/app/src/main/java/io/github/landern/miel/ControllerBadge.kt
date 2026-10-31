@@ -26,11 +26,11 @@ private val controllerFont = FontFamily(Font(R.font.nunito_extrabold, FontWeight
 internal fun ControllerBadge(
     key: String,
     modifier: Modifier = Modifier,
-    face: Color = Color(0xFFF5EFE4),
+    face: Color = Miel.background,
 ) {
     val shoulder = key == "L" || key == "R"
     val shape = if (shoulder) RoundedCornerShape(5.dp) else CircleShape
-    val outline = if (face.luminance() < .65f) Color(0xFF7E561C) else Color(0xFF957A50)
+    val outline = if (face.luminance() < .65f) Miel.ink else Miel.muted
     Box(
         modifier =
             modifier.border(1.2.dp, outline, shape).clearAndSetSemantics {
@@ -42,7 +42,7 @@ internal fun ControllerBadge(
             text = key,
             style =
                 TextStyle(
-                    color = Color(0xFF614019),
+                    color = Miel.ink,
                     fontFamily = controllerFont,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = if (shoulder) 12.sp else 14.sp,

@@ -38,7 +38,14 @@ object SaveStorage {
 
     /** Where a game downloaded from RomM for `platform` is kept, with its folder created. */
     fun download(platform: String, filename: String): File =
-        folder("roms/$platform").resolve(filename)
+        downloadFile(platform, filename).also {
+            val folder = it.parentFile!!
+            if (!folder.isDirectory && !folder.mkdirs()) throw IOException("Cannot create $folder")
+        }
+
+    /** The downloaded ROM path, without creating directories. */
+    fun downloadFile(platform: String, filename: String): File =
+        File(Environment.getExternalStorageDirectory(), "miel/roms/$platform/$filename")
 
     /** Removes only Azahar's compiled and transferable shader caches. */
     fun clearAzaharShaderCache(root: File = root()): Boolean {

@@ -125,7 +125,17 @@ class LibraryActivity : ComponentActivity() {
         library =
             RomLibrary(applicationContext) { scanned ->
                 // The library lists embedded games and DroidDeck exports.
-                val games = scanned.filter { it.playable }
+                val games =
+                    scanned
+                        .filter { it.playable }
+                        .map { game ->
+                            game.copy(
+                                downloaded =
+                                    game.remote &&
+                                        SaveStorage.downloadFile(game.platform, game.romFilename)
+                                            .isFile,
+                            )
+                        }
                 session.replaceGames(games)
                 artwork.update(games)
             }
@@ -431,10 +441,11 @@ class LibraryActivity : ComponentActivity() {
             is Overlay.DeleteRom ->
                 when (command) {
                     Command.A -> {
-                        this.overlay = Overlay.Message("Deleting ROM", overlay.game.romFilename)
+                        val action = if (overlay.game.remote) "Remove download" else "Delete ROM"
+                        this.overlay = Overlay.Message(action, overlay.game.romFilename)
                         library.delete(overlay.game) { error ->
                             this.overlay =
-                                if (error == null) null else Overlay.Message("Delete ROM", error)
+                                if (error == null) null else Overlay.Message(action, error)
                             sounds.play(if (error == null) Cue.CONFIRM else Cue.ERROR)
                         }
                     }

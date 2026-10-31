@@ -21,7 +21,7 @@ class NotificationView(context: Context) : View(context) {
     private val card =
         GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
-            intArrayOf(0xfff8f2e8.toInt(), 0xfff5efe4.toInt(), 0xffeee5d6.toInt()),
+            intArrayOf(0xfffffef8.toInt(), 0xfff6f3eb.toInt(), 0xffede8dc.toInt()),
         )
     private var value: MielNotification? = null
     private val listener: (MielNotification?) -> Unit = { next ->
@@ -69,16 +69,16 @@ class NotificationView(context: Context) : View(context) {
         val top = 12 * s
         val right = width - left
         val bottom = top + 80 * s
-        paint.color = 0xfff5efe4.toInt()
+        paint.color = 0xfff6f3eb.toInt()
         rect.set(left, top, right, bottom)
-        paint.setShadowLayer(4 * s, s, 2 * s, 0x384b3928)
+        paint.setShadowLayer(4 * s, s, 2 * s, 0x38303638)
         canvas.drawRoundRect(rect, 18 * s, 18 * s, paint)
         paint.clearShadowLayer()
         card.setBounds(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
         card.cornerRadius = 18 * s
-        card.setStroke(s.toInt().coerceAtLeast(1), 0xffded2bd.toInt())
+        card.setStroke(s.toInt().coerceAtLeast(1), 0xffd9d4c8.toInt())
         card.draw(canvas)
-        paint.color = 0xfff5bc45.toInt()
+        paint.color = 0xffe9b949.toInt()
         canvas.drawCircle(left + 25 * s, top + 25 * s, 13 * s, paint)
         fun text(
             text: String,
@@ -105,23 +105,23 @@ class NotificationView(context: Context) : View(context) {
             left + 20 * s,
             top + 31 * s,
             18f,
-            0xff4b3928.toInt(),
+            0xff303638.toInt(),
             20 * s,
         )
         val x = left + 48 * s
         val end = right - 14 * s
-        text("miel · ${item.heading}", x, top + 19 * s, 10f, 0xff6c5b46.toInt(), end - x - 90 * s)
+        text("miel · ${item.heading}", x, top + 19 * s, 10f, 0xff69706f.toInt(), end - x - 90 * s)
         paint.textSize = 10 * s
         val countWidth = paint.measureText(item.count)
-        text(item.count, end - countWidth, top + 19 * s, 10f, 0xff6c5b46.toInt(), countWidth + s)
-        text(item.title, x, top + 38 * s, 14f, 0xff4b3928.toInt(), end - x, true)
-        text(item.detail, x, top + 55 * s, 11f, 0xff6c5b46.toInt(), end - x)
+        text(item.count, end - countWidth, top + 19 * s, 10f, 0xff69706f.toInt(), countWidth + s)
+        text(item.title, x, top + 38 * s, 14f, 0xff303638.toInt(), end - x, true)
+        text(item.detail, x, top + 55 * s, 11f, 0xff69706f.toInt(), end - x)
         val barLeft = left + 14 * s
         val barRight = right - 14 * s
         rect.set(barLeft, bottom - 13 * s, barRight, bottom - 8 * s)
-        paint.color = 0xffded2bd.toInt()
+        paint.color = 0xffd9d4c8.toInt()
         canvas.drawRoundRect(rect, 3 * s, 3 * s, paint)
-        paint.color = 0xfff5bc45.toInt()
+        paint.color = 0xffe9b949.toInt()
         if (item.progress < 0) {
             val w = barRight - barLeft
             if (ValueAnimator.areAnimatorsEnabled()) {
@@ -137,7 +137,7 @@ class NotificationView(context: Context) : View(context) {
         if (item.finished && item.unavailableFraction > 0) {
             rect.left = barRight - (barRight - barLeft) * item.unavailableFraction.coerceIn(0f, 1f)
             rect.right = barRight
-            paint.color = 0xffd9bf8b.toInt()
+            paint.color = 0xffd9d4c8.toInt()
             canvas.drawRoundRect(rect, 3 * s, 3 * s, paint)
         }
     }

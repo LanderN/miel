@@ -165,7 +165,7 @@ class CoreActivity : ComponentActivity() {
         status = TextView(this)
         status.setTextColor(Color.WHITE)
         status.textSize = 12f
-        status.setBackgroundColor(0x993f3024.toInt())
+        status.setBackgroundColor(0x99303638.toInt())
         status.setPadding(12, 8, 12, 8)
         overlay = LoadingOverlay(this, intent.getStringExtra(EXTRA_TITLE))
         if (diagnostic) {

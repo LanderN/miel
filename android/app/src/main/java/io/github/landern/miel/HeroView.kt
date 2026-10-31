@@ -112,7 +112,7 @@ class HeroView(context: Context) : View(context) {
                 0f,
                 0f,
                 height.toFloat(),
-                intArrayOf(0x00211c15, 0x55211c15, 0xee211c15.toInt()),
+                intArrayOf(0x00222729, 0x55222729, 0xee222729.toInt()),
                 floatArrayOf(.32f, .58f, 1f),
                 Shader.TileMode.CLAMP,
             )
@@ -159,7 +159,7 @@ class HeroView(context: Context) : View(context) {
         val layer = canvas.saveLayerAlpha(0f, 0f, width, height, (255 * alpha).toInt())
         val settings = hero.settings
         if (settings != null) {
-            canvas.drawColor(0xfff5efe4.toInt())
+            canvas.drawColor(0xfff6f3eb.toInt())
             drawSettings(canvas, settings, scale, width, height)
         } else {
             canvas.drawColor(BACKGROUND)
@@ -182,7 +182,7 @@ class HeroView(context: Context) : View(context) {
         var y = gutter
         fun text(value: String, size: Float, bold: Boolean = false, lines: Int = 1) {
             paint.typeface = if (bold) titleFace else detailFace
-            paint.color = if (bold) 0xff4b3928.toInt() else 0xff6c5b46.toInt()
+            paint.color = if (bold) 0xff303638.toInt() else 0xff69706f.toInt()
             paint.textSize = size * scale * resources.configuration.fontScale
             val layout =
                 StaticLayout.Builder.obtain(value, 0, value.length, paint, textWidth)
@@ -211,7 +211,7 @@ class HeroView(context: Context) : View(context) {
             y += 16 * scale
             drawPreview(canvas, detail, scale, gutter, y, width - gutter, ruleTop - 16 * scale)
         }
-        paint.color = 0xffd8c49e.toInt()
+        paint.color = 0xffd9d4c8.toInt()
         canvas.drawRect(gutter, height - gutter - scale, width - gutter, height - gutter, paint)
     }
 
@@ -246,7 +246,7 @@ class HeroView(context: Context) : View(context) {
             else drawLayout(canvas, bounds, value.toIntOrNull() ?: 1, scale)
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = (if (selected) 3 else 2) * scale
-            paint.color = if (selected) 0xffe9b44c.toInt() else 0xffede5d7.toInt()
+            paint.color = if (selected) 0xffe9b949.toInt() else 0xffede8dc.toInt()
             val inset = paint.strokeWidth / 2
             canvas.drawRoundRect(
                 bounds.left + inset,
@@ -259,7 +259,7 @@ class HeroView(context: Context) : View(context) {
             )
             paint.style = Paint.Style.FILL
             paint.typeface = if (selected) titleFace else detailFace
-            paint.color = if (selected) 0xff4b3928.toInt() else 0xff6c5b46.toInt()
+            paint.color = if (selected) 0xff303638.toInt() else 0xff69706f.toInt()
             paint.textSize = labelSize
             paint.textAlign = Paint.Align.CENTER
             val label = if (resolution) "$value×" else if (value == "1") "1 row" else "2 rows"
@@ -285,7 +285,7 @@ class HeroView(context: Context) : View(context) {
         val tileHeight = tileWidth * aspect
         val left = panel.left + (panel.width() - (count * tileWidth + (count - 1) * gap)) / 2
         val top = panel.top + (panel.height() - (rows * tileHeight + (rows - 1) * gap)) / 2
-        paint.color = 0xffd8c49e.toInt()
+        paint.color = 0xffd9d4c8.toInt()
         for (row in 0 until rows) {
             for (column in 0 until count) {
                 val x = left + column * (tileWidth + gap)
@@ -378,12 +378,12 @@ class HeroView(context: Context) : View(context) {
         paint.typeface = detailFace
         paint.textSize = 14 * scale
         if (hero.played.isNotEmpty()) {
-            paint.color = 0xfff5bc45.toInt()
+            paint.color = 0xffe9b949.toInt()
             paint.alpha = opacity
             canvas.drawText(hero.played, x, detailY, paint)
             detailY -= paint.fontSpacing
         }
-        paint.color = 0xffe5d6bc.toInt()
+        paint.color = 0xffd9d4c8.toInt()
         paint.alpha = opacity
         val detail =
             TextUtils.ellipsize(hero.detail, paint, width - 2 * x, TextUtils.TruncateAt.END)
@@ -391,7 +391,7 @@ class HeroView(context: Context) : View(context) {
         canvas.drawText(detail, x, detailY, paint)
         val titleBottom = detailY + paint.fontMetrics.ascent - 8 * scale
         paint.typeface = titleFace
-        paint.color = 0xfffdfaf3.toInt()
+        paint.color = 0xfffffef8.toInt()
         paint.alpha = opacity
         paint.textSize = 32 * scale
         val titleBaseline = titleBottom - paint.fontMetrics.descent
@@ -416,7 +416,7 @@ class HeroView(context: Context) : View(context) {
     }
 
     companion object {
-        private val BACKGROUND = Color.rgb(63, 48, 36)
+        private val BACKGROUND = Color.rgb(48, 54, 56)
         private val EMPTY = Hero("", "", "")
         private val LAYOUTS = listOf("1", "2")
 

@@ -34,7 +34,7 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
 
     init {
         val dp = resources.displayMetrics.density
-        setBackgroundColor(0xff3f3024.toInt())
+        setBackgroundColor(0xff303638.toInt())
         isClickable = true
         art.scaleType = ImageView.ScaleType.CENTER_CROP
         addView(art, LayoutParams(MATCH_PARENT, MATCH_PARENT))
@@ -42,7 +42,7 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
         scrim.background =
             GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                intArrayOf(0x803f3024.toInt(), 0xd93f3024.toInt(), 0xfa3f3024.toInt()),
+                intArrayOf(0x80303638.toInt(), 0xd9303638.toInt(), 0xfa303638.toInt()),
             )
         addView(scrim, LayoutParams(MATCH_PARENT, MATCH_PARENT))
 
@@ -52,7 +52,7 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
         val padding = (32 * dp).roundToInt()
         column.setPadding(padding, padding, padding, (48 * dp).roundToInt())
         val heading = TextView(context)
-        heading.setTextColor(0xfffbf7ef.toInt())
+        heading.setTextColor(0xfffffef8.toInt())
         heading.textSize = 24f
         heading.typeface = resources.getFont(R.font.nunito_bold)
         heading.gravity = Gravity.CENTER
@@ -61,7 +61,7 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
         heading.text = title
         heading.visibility = if (title.isNullOrEmpty()) GONE else VISIBLE
         column.addView(heading)
-        status.setTextColor(0xccfbf7ef.toInt())
+        status.setTextColor(0xccfffef8.toInt())
         status.textSize = 14f
         status.typeface = resources.getFont(R.font.nunito_regular)
         status.gravity = Gravity.CENTER
@@ -143,7 +143,7 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
             val height = height.toFloat()
             val radius = height / 2
             paint.shader = null
-            paint.color = 0x33fbf7ef
+            paint.color = 0x33fffef8
             rect.set(0f, 0f, width, height)
             canvas.drawRoundRect(rect, radius, radius, paint)
             paint.shader =
@@ -152,8 +152,8 @@ class LoadingOverlay(context: Context, title: String?) : FrameLayout(context) {
                     0f,
                     width,
                     0f,
-                    0xfff5bc45.toInt(),
-                    0xffe8a329.toInt(),
+                    0xffe9b949.toInt(),
+                    0xffd9a936.toInt(),
                     Shader.TileMode.CLAMP,
                 )
             if (progress >= 0) {

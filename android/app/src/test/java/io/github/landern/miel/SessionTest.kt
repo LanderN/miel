@@ -28,6 +28,20 @@ class SessionTest {
     private fun apps(vararg ids: String) = ids.map { InstalledApp(it, it.uppercase()) }
 
     @Test
+    fun onlyDownloadedRommGamesOfferRemovalAndKeepTheirLibraryEntry() {
+        val s = open(1)
+        val remote = game(0).copy(romUri = "romm:42", rommId = 42)
+        s.replaceGames(listOf(remote))
+        assertFalse(Command.DeleteRom in s.moreActions)
+        s.replaceGames(listOf(remote.copy(downloaded = true)))
+        assertTrue(Command.DeleteRom in s.moreActions)
+        s.replaceGames(listOf(remote))
+        assertFalse(Command.DeleteRom in s.moreActions)
+        assertEquals(remote.id, s.game?.id)
+        assertTrue(s.game!!.playable)
+    }
+
+    @Test
     fun launchesOrderTheLibraryAndSurviveReopening() {
         val s = open()
         s.run(Command.Down)

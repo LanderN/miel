@@ -113,19 +113,19 @@ internal object Miel {
         )
     val textSmall = 12.sp
     val textBody = 14.sp
-    val background = Color(0xFFF5EFE4)
-    val surface = Color(0xFFFFFAF1)
-    val ink = Color(0xFF4B3928)
-    val muted = Color(0xFF6C5B46)
-    val softInk = Color(0xFF7A6850)
-    val cream = Color(0xFFFBF8F2)
+    val background = Color(0xFFF6F3EB)
+    val surface = Color(0xFFFFFEF8)
+    val ink = Color(0xFF303638)
+    val muted = Color(0xFF69706F)
+    val softInk = Color(0xFF69706F)
+    val cream = Color(0xFFFFFEF8)
     val rose = Color(0xFF9A455A)
-    val line = Color(0xFFDED2BD)
-    val pressed = Color(0xFFEDE2CE)
-    val selection = Color(0xFFF3E2BE)
-    val honey = Color(0xFFF5BC45)
-    val ring = Color(0xFFA8731C)
-    val keyInk = Color(0xFF6B481D)
+    val line = Color(0xFFD9D4C8)
+    val pressed = Color(0xFFEDE8DC)
+    val selection = Color(0xFFF3CD72)
+    val honey = Color(0xFFE9B949)
+    val ring = Color(0xFFB38A27)
+    val keyInk = Color(0xFF303638)
     val easeOut = CubicBezierEasing(.2f, 0f, .2f, 1f)
 }
 
@@ -182,7 +182,7 @@ fun qrCode(text: String): ImageBitmap {
     val bitmap = Bitmap.createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888)
     for (y in 0 until matrix.height) {
         for (x in 0 until matrix.width) {
-            bitmap.setPixel(x, y, if (matrix[x, y]) 0xFF3F3024.toInt() else 0xFFFFFFFF.toInt())
+            bitmap.setPixel(x, y, if (matrix[x, y]) 0xFF303638.toInt() else 0xFFFFFFFF.toInt())
         }
     }
     return bitmap.asImageBitmap()
@@ -239,7 +239,7 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
                         Text(
                             "%02d / %02d".format(position + 1, total),
                             Modifier.widthIn(min = 48.dp),
-                            Color(0xFF7A5517),
+                            Miel.muted,
                             Miel.textSmall,
                             FontWeight.Bold,
                             align = TextAlign.Center,
@@ -504,7 +504,7 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
                     modifier,
                     contentScale = ContentScale.Crop,
                 )
-            if (game.rommId != 0 && game.romUri.startsWith("romm:")) {
+            if (game.remote && !game.downloaded) {
                 Box(
                     Modifier.padding(Miel.spaceSm)
                         .size(26.dp)
@@ -588,8 +588,8 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
                     Modifier.fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                0.45f to Color(0x003F3024),
-                                1f to Color(0xD03F3024),
+                                0.45f to Color(0x00303638),
+                                1f to Color(0xD0303638),
                             ),
                         ),
                     contentAlignment = Alignment.BottomStart,
@@ -640,7 +640,7 @@ private fun ColumnScope.AppGrid(session: Session, art: Art, command: (Command) -
                 else Image(painterResource(R.drawable.miel_unknown), null, Modifier.size(size))
                 Text(
                     app.label,
-                    color = if (chosen) Color(0xFF5C3B16) else Color(0xFF5F503D),
+                    color = if (chosen) Miel.ink else Miel.muted,
                     size = Miel.textSmall,
                     weight = FontWeight.SemiBold,
                     align = TextAlign.Center,
@@ -712,7 +712,7 @@ private fun Dots(total: Int, position: Int) {
             Box(
                 Modifier.width(width)
                     .height(7.dp)
-                    .background(if (i == position) Miel.ring else Color(0xFFE3D6BE), CircleShape),
+                    .background(if (i == position) Miel.ring else Color(0xFFD9D4C8), CircleShape),
             )
         }
     }
@@ -762,10 +762,10 @@ internal fun RowScope.Pill(
             animateColorAsState(
                 when {
                     pressed && destructive -> Color(0xFFF3D3DB)
-                    pressed && primary -> Color(0xFFE6A62F)
+                    pressed && primary -> Color(0xFFD9A936)
                     pressed -> Miel.pressed
                     destructive -> Color(0xFFFBE8EB)
-                    primary -> Color(0xFFEFB13A)
+                    primary -> Miel.honey
                     else -> Miel.surface
                 },
                 tween(120, easing = Miel.easeOut),
@@ -848,7 +848,7 @@ internal fun Segmented(
                 ) {
                     Text(
                         option,
-                        color = if (i == current) Color(0xFF4B321B) else Color(0xFF6E5F4B),
+                        color = if (i == current) Miel.ink else Miel.muted,
                         size = if (optionWidth == null) Miel.textSmall else Miel.textBody,
                         weight = FontWeight.Bold,
                         lines = 1,
@@ -867,7 +867,7 @@ private fun Dialog(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Box(
-        Modifier.fillMaxSize().background(Color(0x66493922)).clickable(
+        Modifier.fillMaxSize().background(Color(0x66303638)).clickable(
             remember { MutableInteractionSource() },
             null,
         ) {},
@@ -958,7 +958,8 @@ private fun More(session: Session, command: (Command) -> Unit) {
                                 if (session.favorite) "Remove from Favorites"
                                 else "Add to Favorites"
                             Command.Y -> "Emulator settings"
-                            Command.DeleteRom -> "Delete ROM"
+                            Command.DeleteRom ->
+                                if (game?.remote == true) "Remove download" else "Delete ROM"
                             else -> "Start fresh"
                         }
                     MoreRow(label, i == session.moreRow, action == Command.DeleteRom) {
@@ -984,16 +985,19 @@ private fun More(session: Session, command: (Command) -> Unit) {
 
 @Composable
 private fun DeleteRom(overlay: Overlay.DeleteRom, command: (Command) -> Unit) {
-    Dialog("Delete ROM?") {
+    val download = overlay.game.remote
+    val action = if (download) "Remove download" else "Delete ROM"
+    Dialog("$action?") {
         Text(overlay.game.romFilename, color = Miel.ink, size = Miel.textBody)
         Text(
-            "Permanently deletes this file. Saves are kept.",
+            if (download) "Removes the device copy. Saves and the RomM copy are kept."
+            else "Permanently deletes this file. Saves are kept.",
             color = Miel.muted,
             size = Miel.textBody,
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Miel.inset)) {
             Pill("B", "Cancel", primary = false, fill = true) { command(Command.B) }
-            Pill("A", "Delete ROM", destructive = true, fill = true) { command(Command.A) }
+            Pill("A", action, destructive = true, fill = true) { command(Command.A) }
         }
     }
 }

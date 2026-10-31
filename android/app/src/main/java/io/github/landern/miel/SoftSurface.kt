@@ -16,21 +16,21 @@ import androidx.compose.ui.unit.dp
 internal fun Modifier.softShadow(shape: Shape, height: Float = 1f): Modifier =
     dropShadow(
             shape,
-            Shadow(1.2.dp, Color(0x24654A28), offset = DpOffset(.5.dp, 1.dp * height)),
+            Shadow(1.2.dp, Color(0x38A7A091), offset = DpOffset(.5.dp, 1.dp * height)),
         )
         .dropShadow(
             shape,
             Shadow(
                 3.dp * height,
-                Color(0x16654A28),
-                offset = DpOffset(1.dp * height, 2.dp * height),
+                Color(0xCCFFFEF8),
+                offset = DpOffset(-3.dp * height, -3.dp * height),
             ),
         )
         .dropShadow(
             shape,
             Shadow(
                 7.dp * height,
-                Color(0x14654A28),
+                Color(0x66A7A091),
                 offset = DpOffset(3.dp * height, 5.dp * height),
             ),
         )
@@ -46,7 +46,7 @@ internal fun Modifier.relief(
     val surface =
         base.background(
             Brush.linearGradient(
-                listOf(lerp(face, Color.White, .025f), lerp(face, Color(0xFF6B5035), .015f)),
+                listOf(lerp(face, Color.White, .025f), lerp(face, Color(0xFFA7A091), .015f)),
             ),
             shape,
         )
@@ -54,11 +54,11 @@ internal fun Modifier.relief(
         surface
             .innerShadow(
                 shape,
-                Shadow(3.dp, Color(0x2667502F), offset = DpOffset(1.dp, 1.5.dp)),
+                Shadow(3.dp, Color(0x66A7A091), offset = DpOffset(1.dp, 1.5.dp)),
             )
             .innerShadow(
                 shape,
-                Shadow(1.dp, Color(0x33FFF3D8), offset = DpOffset(-.4.dp, -.6.dp)),
+                Shadow(1.dp, Color(0x99FFFEF8), offset = DpOffset(-.4.dp, -.6.dp)),
             )
     else surface
 }

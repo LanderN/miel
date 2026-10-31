@@ -98,7 +98,7 @@ class PlayControls(
     private var settings by mutableStateOf(fastForwardSettings)
     private var art by mutableStateOf<ImageBitmap?>(null)
     private var batteryAt = 0L
-    private val paper = Color(0xFFFBF7EF)
+    private val paper = Color(0xFFFFFEF8)
 
     val isOpen
         get() = sheet != null
@@ -220,7 +220,7 @@ class PlayControls(
 
     @Composable
     override fun Content() {
-        Box(Modifier.fillMaxSize().background(Color(0xFF3F3024))) {
+        Box(Modifier.fillMaxSize().background(Color(0xFF303638))) {
             art?.let {
                 Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             }
@@ -228,7 +228,7 @@ class PlayControls(
                 Modifier.fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color(0xB33F3024), Color(0xD93F3024), Color(0xFA3F3024)),
+                            listOf(Color(0xB3303638), Color(0xD9303638), Color(0xFA303638)),
                         ),
                     ),
             )

@@ -1,10 +1,10 @@
 <resources>
-    <color name="miel_cream">#F5EFE4</color>
+    <color name="miel_cream">#F6F3EB</color>
 
     <style name="MielTheme" parent="android:Theme.Material.NoActionBar.Fullscreen">
         <item name="android:alertDialogTheme">@style/MielDialog</item>
-        <item name="android:colorAccent">#A36A16</item>
-        <item name="android:colorControlActivated">#A8731C</item>
+        <item name="android:colorAccent">#303638</item>
+        <item name="android:colorControlActivated">#303638</item>
         <item name="android:navigationBarColor">@color/miel_cream</item>
         <item name="android:windowLightNavigationBar">true</item>
     </style>
@@ -13,10 +13,10 @@
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">@drawable/miel_dialog</item>
         <item name="android:colorBackground">@color/miel_cream</item>
-        <item name="android:textColorPrimary">#4B3928</item>
-        <item name="android:textColorSecondary">#6C5B46</item>
+        <item name="android:textColorPrimary">#303638</item>
+        <item name="android:textColorSecondary">#69706F</item>
         <item name="android:fontFamily">@font/nunito_regular</item>
-        <item name="android:colorAccent">#A36A16</item>
+        <item name="android:colorAccent">#303638</item>
         <item name="android:windowElevation">8dp</item>
     </style>
 </resources>

@@ -76,7 +76,7 @@ internal fun LibraryNavigation(
             ) { pressed ->
                 val face by
                     animateColorAsState(
-                        if (active) Miel.honey else if (pressed) Miel.selection else Miel.pressed,
+                        if (active || pressed) Miel.selection else Miel.pressed,
                         tween(160, easing = Miel.easeOut),
                     )
                 val lift by
