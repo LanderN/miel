@@ -288,7 +288,7 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
 @Composable
 private fun Header(session: Session, command: (Command) -> Unit) {
     Row(
-        Modifier.fillMaxWidth().height(64.dp),
+        Modifier.fillMaxWidth().height(Miel.control + 12.dp),
         horizontalArrangement = Arrangement.spacedBy(Miel.gap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -373,11 +373,12 @@ private fun ColumnScope.TileGrid(
         val cellWidth = aspect?.let { minOf(columnWidth, rowHeight * it) } ?: columnWidth
         val cellHeight =
             aspect?.let { minOf(rowHeight, cellWidth / it.coerceAtLeast(0.1f)) } ?: rowHeight
+        val gridWidth = if (aspect != null) cellWidth * columns + gap * (columns - 1) else maxWidth
         val remaining = maxHeight - cellHeight * rows - gap * (rows - 1)
         val top = if (rows == 1) remaining / 2 else remaining
-        val stride = with(density) { (columnWidth + gap).toPx() }
+        val stride = with(density) { (cellWidth + gap).toPx() }
         val viewport = with(density) { maxWidth.toPx() }
-        val tileWidth = with(density) { columnWidth.toPx() }
+        val tileWidth = with(density) { cellWidth.toPx() }
         val maxScroll =
             (((total + rows - 1) / rows - 1) * stride + tileWidth - viewport).coerceAtLeast(0f)
         var scroll by remember(rows, total) { mutableFloatStateOf(0f) }
@@ -393,7 +394,7 @@ private fun ColumnScope.TileGrid(
             scroll = scroll.coerceIn(0f, maxScroll)
         }
         val scrollDp = with(density) { scroll.toDp() }
-        fun x(slot: Int) = (columnWidth + gap) * (slot / rows) + (columnWidth - cellWidth) / 2
+        fun x(slot: Int) = (cellWidth + gap) * (slot / rows)
         fun y(slot: Int) =
             if (rows == 1) topInset + (availableHeight - cellHeight) / 2
             else top + (cellHeight + gap) * (slot % rows)

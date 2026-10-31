@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -40,11 +39,14 @@ internal fun LibraryNavigation(
     modifier: Modifier = Modifier,
     picked: (Tab) -> Unit,
 ) {
+    val itemSize = Miel.control
+    val gap = Miel.spaceXs
+    val edge = Miel.spaceXs
     val scroll = rememberScrollState()
     val density = LocalDensity.current
     LaunchedEffect(current, tabs, scroll.viewportSize, scroll.maxValue, density) {
-        val left = with(density) { (68.dp * tabs.indexOf(current)).toPx() }.roundToInt()
-        val right = left + with(density) { 72.dp.toPx() }.roundToInt()
+        val left = with(density) { ((itemSize + gap) * tabs.indexOf(current)).toPx() }.roundToInt()
+        val right = left + with(density) { (itemSize + edge * 2).toPx() }.roundToInt()
         val target =
             when {
                 left < scroll.value -> left
@@ -55,17 +57,17 @@ internal fun LibraryNavigation(
     }
     Row(
         modifier
-            .height(64.dp)
+            .height(itemSize + 12.dp)
             .relief(RoundedCornerShape(24.dp), Miel.pressed, inset = true)
             .padding(6.dp)
             .horizontalScroll(scroll)
-            .padding(horizontal = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(horizontal = edge),
+        horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
     ) {
         tabs.forEach { tab ->
             val active = tab == current
             Pressable(
-                Modifier.width(64.dp).height(52.dp).semantics {
+                Modifier.size(itemSize).semantics {
                     selected = active
                     contentDescription = tab.platform ?: tab.label
                     role = Role.Tab
@@ -86,7 +88,7 @@ internal fun LibraryNavigation(
                     Modifier.fillMaxSize()
                         .then(
                             if (active || pressed)
-                                Modifier.controlSurface(RoundedCornerShape(19.dp), face, pressed)
+                                Modifier.controlSurface(RoundedCornerShape(15.dp), face, pressed)
                             else Modifier,
                         ),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -95,7 +97,7 @@ internal fun LibraryNavigation(
                     Image(
                         painterResource(tab.navigationIcon),
                         null,
-                        Modifier.size(38.dp).graphicsLayer { translationY = lift.dp.toPx() },
+                        Modifier.size(32.dp).graphicsLayer { translationY = lift.dp.toPx() },
                         colorFilter = ColorFilter.tint(if (active) Miel.ink else Miel.softInk),
                     )
                 }
