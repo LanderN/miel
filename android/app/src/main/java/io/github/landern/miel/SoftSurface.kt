@@ -21,14 +21,6 @@ internal fun Modifier.softShadow(shape: Shape, height: Float = 1f): Modifier =
         .dropShadow(
             shape,
             Shadow(
-                3.dp * height,
-                Color(0xCCFFFEF8),
-                offset = DpOffset(-3.dp * height, -3.dp * height),
-            ),
-        )
-        .dropShadow(
-            shape,
-            Shadow(
                 7.dp * height,
                 Color(0x66A7A091),
                 offset = DpOffset(3.dp * height, 5.dp * height),
