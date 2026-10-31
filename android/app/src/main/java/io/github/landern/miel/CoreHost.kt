@@ -80,6 +80,9 @@ object CoreHost {
     /** Requests a checkpoint, then an exit once it is written. */
     @JvmStatic external fun save(exitAfterSave: Boolean)
 
+    /** Queues a save or load while paused. Slot 0 is Auto save (load only); 1..5 are manual. */
+    @JvmStatic external fun state(slot: Int, load: Boolean): Boolean
+
     @JvmStatic external fun stop()
 
     @JvmStatic external fun button(id: Int, down: Boolean)

@@ -74,6 +74,8 @@ class CoreActivity : ComponentActivity() {
     @Volatile private var stagingProgress = LoadingOverlay.PULSE
     @Volatile private var stagingStatus = "Preparing your game…"
     private var statePath = ""
+    private var stateOperation = 0L
+    private var stateMessage = ""
     private var savePath = ""
     private var framePath = ""
     private var lastStatus = ""
@@ -182,6 +184,7 @@ class CoreActivity : ComponentActivity() {
                 opened = {
                     wakeLower()
                     CoreHost.pause(true)
+                    updateStates(report())
                 },
                 dismissed = {
                     wakeLower()
@@ -206,6 +209,14 @@ class CoreActivity : ComponentActivity() {
                     fastForwardSettings = fastForwardSettings + (key to value)
                     FastForwardSettings.save(this, gameId, key, value)
                     if (fastForward) setFastForward(true)
+                },
+                stateAction = { slot, load ->
+                    if (ready && !closing && CoreHost.state(slot, load)) {
+                        stateMessage = if (load) "Loading…" else "Saving…"
+                    } else {
+                        stateMessage = "Save state is unavailable. Try again."
+                    }
+                    updateStates(report())
                 },
                 leave = ::returnToLibrary,
                 resume = { showPopup(false) },
@@ -570,6 +581,7 @@ class CoreActivity : ComponentActivity() {
             fastForward,
             played + unsavedPlay,
         )
+        updateStates(info)
         val checkpoints = info.optInt("checkpoints")
         if (checkpoints > this.checkpoints) {
             this.checkpoints = checkpoints
@@ -772,6 +784,31 @@ class CoreActivity : ComponentActivity() {
             )
         }
         CoreHost.save(exit)
+    }
+
+    private fun updateStates(info: JSONObject) {
+        val completed = info.optLong("stateOperation")
+        if (completed > stateOperation) {
+            stateOperation = completed
+            val slot = info.optInt("stateSlot")
+            val name = if (slot == 0) "Auto save" else "Slot $slot"
+            stateMessage =
+                when (info.optString("stateResult")) {
+                    "saved" -> "Saved to $name"
+                    "loaded" -> "Loaded $name"
+                    else -> info.optString("stateError", "Save state failed")
+                }
+        }
+        if (statePath.isEmpty() || !playControls.isOpen) return
+        val slots =
+            (0..5).map { slot ->
+                val path = statePath + if (slot == 0) "" else ".slot-$slot"
+                PlayControls.StateSlot(
+                    slot,
+                    maxOf(File(path).lastModified(), File("$path.bak").lastModified()),
+                )
+            }
+        playControls.updateStates(slots, info.optBoolean("stateBusy"), stateMessage)
     }
 
     /** Writes `frame` to EXTRA_FRAME, replacing the previous checkpoint's. */

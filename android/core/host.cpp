@@ -98,6 +98,8 @@ std::thread worker;
 // Requests from Java.
 std::atomic<bool> running{false}, paused{false}, stopping{false}, saveRequested{false},
     exitAfterSave{false};
+std::atomic<int> requestedState{0};  // Save slots 1..5; load slots 0..5 encoded as 6..11.
+std::atomic<bool> stateBusy{false};
 
 retro_disk_control_callback disks{};
 std::atomic<int> requestedDisc{-1}, requestedAnalog{-1};
@@ -133,6 +135,9 @@ std::atomic<uint64_t> rumbleRequests{0}, rumblePeak{0};
 
 std::mutex textMutex;  // Guards the strings below.
 std::string message = "Not started", coreName, coreVersion, lastCoreMessage, loadingMessage;
+std::string stateResult, stateError;
+int stateSlot = 0;
+uint64_t stateOperation = 0;
 double loadingProgress = -1;
 std::string systemPath, saveDirectoryPath;
 std::string root, statePath, sramPath;
@@ -996,6 +1001,14 @@ bool writeCheckpoint(const std::string path, const std::string identity,
     return syncDirectory(path);
 }
 
+void finishState(bool ok, bool load) {
+    std::lock_guard lock(textMutex);
+    stateResult = ok ? (load ? "loaded" : "saved") : "error";
+    stateError = ok ? "" : (load ? "Could not load this save state." : "Could not save this slot.");
+    stateOperation++;
+    stateBusy = false;
+}
+
 // Writes the in-game save, then the checkpoint.
 bool writeSave(const std::string path, const std::string identity, const std::vector<uint8_t> bytes,
                const std::string savePath, const std::vector<uint8_t> save) {
@@ -1163,8 +1176,13 @@ void loop(const Launch& launch, double fps) {
     double averageFrame = 1. / fps;
     std::future<bool> writing;
     bool writingExit = false, writingPeriodic = false;
+    bool writingManual = false;
     uint64_t writeStart = 0, writingFrame = 0;
     auto finishSave = [&](bool ok) {
+        if (writingManual) {
+            finishState(ok, false);
+            return;
+        }
         checkpointFailed = !ok;
         status(ok ? "Session ready" : "Checkpoint failed; session kept open");
         if (!ok) {
@@ -1215,11 +1233,17 @@ void loop(const Launch& launch, double fps) {
             writeMicros = micros() - writeStart;
             finishSave(ok);
             if (writingExit && ok) {
-                exitReady = true;
-                return;
+                std::lock_guard lock(textMutex);
+                if (!stateBusy) {
+                    exitReady = true;
+                    return;
+                }
+                exitAfterSave = saveRequested = true;
             }
         }
-        if (ready && !writing.valid() && (saveRequested.exchange(false) || periodic)) {
+        if (ready && !writing.valid() && !stateBusy &&
+            (saveRequested.exchange(false) || periodic)) {
+            writingManual = false;
             writingExit = exitAfterSave.exchange(false);
             writingPeriodic = periodic;
             checkpointDue = Clock::now() + interval;
@@ -1233,6 +1257,35 @@ void loop(const Launch& launch, double fps) {
                 writingFrame = frames;
                 writing = std::async(std::launch::async, writeSave, statePath, identity(),
                                      std::move(bytes), sramPath, sram());
+            }
+        }
+        if (ready && !writing.valid()) {
+            int request = requestedState.exchange(0);
+            if (request != 0) {
+                bool load = request >= 6;
+                int slot = load ? request - 6 : request;
+                std::string path = statePath + (slot == 0 ? "" : ".slot-" + std::to_string(slot));
+                if (load) {
+                    bool ok = restoreFile(path) || restoreFile(path + ".bak");
+                    releaseInput();
+                    audioFlush = true;
+                    stretching = false;
+                    next = lastFrame = Clock::now();
+                    averageFrame = 1. / fps;
+                    speed = 1;
+                    finishState(ok, true);
+                } else {
+                    auto bytes = snapshot();
+                    if (bytes.empty()) {
+                        finishState(false, false);
+                    } else {
+                        writingManual = true;
+                        writingExit = writingPeriodic = false;
+                        writeStart = micros();
+                        writing = std::async(std::launch::async, writeCheckpoint, path, identity(),
+                                             std::move(bytes));
+                    }
+                }
             }
         }
         // The bootstrap frames run even while paused or hidden: a Home pressed during loading
@@ -1487,6 +1540,12 @@ extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_start(
     coreVersion.clear();
     lastCoreMessage.clear();
     loadingMessage.clear();
+    stateResult.clear();
+    stateError.clear();
+    stateSlot = 0;
+    stateOperation = 0;
+    requestedState = 0;
+    stateBusy = false;
     loadingProgress = -1;
     frames = upperFrames = lowerFrames = audioFrames = audioDelivered = inputEvents = glErrors = 0;
     checkpoints = lastSavedFrame = periodicSaves = 0;
@@ -1552,6 +1611,7 @@ extern "C" JNIEXPORT jint JNICALL Java_io_github_landern_miel_CoreHost_rumble(JN
 
 extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_pause(JNIEnv*, jclass,
                                                                              jboolean value) {
+    if (!value && stateBusy) return;
     paused = value;
     if (value) {
         releaseInput();
@@ -1568,9 +1628,24 @@ extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_save(JNIE
     saveRequested = true;
 }
 
+extern "C" JNIEXPORT jboolean JNICALL Java_io_github_landern_miel_CoreHost_state(JNIEnv*, jclass,
+                                                                                 jint slot,
+                                                                                 jboolean load) {
+    std::lock_guard lock(textMutex);
+    if (slot < 0 || slot > 5 || (!load && slot == 0) || !running || !ready || !paused || stopping ||
+        exitAfterSave || exitReady || failed || stateBusy)
+        return false;
+    stateBusy = true;
+    stateSlot = slot;
+    stateResult.clear();
+    stateError.clear();
+    requestedState = load ? slot + 6 : slot;
+    return true;
+}
+
 extern "C" JNIEXPORT void JNICALL Java_io_github_landern_miel_CoreHost_stop(JNIEnv*, jclass) {
     // A save requested by onPause still finishes when the activity is destroyed.
-    if (exitAfterSave || saveRequested) {
+    if (exitAfterSave || saveRequested || stateBusy) {
         exitAfterSave = true;
         saveRequested = true;
     } else {
@@ -1623,6 +1698,11 @@ extern "C" JNIEXPORT jstring JNICALL Java_io_github_landern_miel_CoreHost_report
         std::lock_guard lock(textMutex);
         report.add("message", message).add("core", coreName).add("version", coreVersion);
         report.add("loadingMessage", loadingMessage).add("loadingProgress", loadingProgress);
+        report.add("stateResult", stateResult)
+            .add("stateError", stateError)
+            .add("stateSlot", uint64_t(stateSlot))
+            .add("stateOperation", stateOperation)
+            .add("stateBusy", stateBusy.load());
     }
     report.add("running", running.load())
         .add("failed", failed.load())
