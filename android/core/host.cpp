@@ -209,7 +209,14 @@ void require(bool condition, const std::string& error) {
     if (!condition) throw std::runtime_error(error);
 }
 
-std::string identity() { return coreName + "\n" + coreVersion; }
+std::string identity() {
+    const auto codes = variables.find("miel_game_codes");
+    const std::string suffix =
+        coreName == "dolphin-emu" && codes != variables.end() && !codes->second.empty()
+            ? "\ncodes:" + codes->second
+            : "";
+    return coreName + "\n" + coreVersion + suffix;
+}
 
 // Video.
 

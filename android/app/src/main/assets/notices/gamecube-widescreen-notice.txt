@@ -1,0 +1,15 @@
+GameCube widescreen catalog
+
+Code sources: Dolphin Emulator Wiki, https://wiki.dolphin-emu.org/
+License: Creative Commons Attribution-ShareAlike 3.0 Unported
+https://creativecommons.org/licenses/by-sa/3.0/
+
+Credits: Ralf; gamemasterplc; SuperSamus; Dolphin Wiki contributors.
+The Wind Waker code author is not specified on the source page.
+
+The catalog asset gamecube-widescreen.json records each source page's permanent
+revision URL and the original code titles. Code lines are reproduced unchanged.
+Miel groups companion fixes, limits the offered disc revisions, and adds launch
+settings and descriptive metadata. The catalog remains under CC-BY-SA-3.0.
+It is distributed without a warranty of compatibility with any particular game
+revision, emulator, or device.

@@ -61,6 +61,10 @@ class LibraryActivity : ComponentActivity() {
     private val lowerArtwork = LowerArtwork(this)
     private val displayListener = Displays.Listener(this) { lowerArtwork.show() }
     private var overlay by mutableStateOf<Overlay?>(null)
+    private val typing: Boolean
+        get() =
+            overlay is Overlay.RomMAddress || (overlay as? Overlay.Codes)?.editor?.editing == true
+
     private val keyFocus by lazy { View(this).apply { isFocusableInTouchMode = true } }
 
     /** Bumped whenever new artwork is cached. */
@@ -156,7 +160,6 @@ class LibraryActivity : ComponentActivity() {
             Library(session, overlay, art, ::command)
             val hero = hero()
             SideEffect { lowerArtwork.update(hero) }
-            val typing = overlay is Overlay.RomMAddress
             LaunchedEffect(typing) { if (!typing) keyFocus.requestFocus() }
         }
         // Leaving touch mode consumes the first navigation key unless a plain View holds focus.
@@ -302,6 +305,15 @@ class LibraryActivity : ComponentActivity() {
                 }
             return
         }
+        if (command == Command.GameCodes && session.menu && !session.confirm) {
+            session.game
+                ?.takeIf { it.core == Core.DOLPHIN }
+                ?.let {
+                    overlay = Overlay.Codes(GameCodesEditor(applicationContext, it, lifecycleScope))
+                    sounds.play(Cue.OPEN)
+                }
+            return
+        }
         if (command == Command.Y && session.menu && !session.confirm) {
             session.game?.core?.let { overlay = Overlay.Settings(core = it, perGame = true) }
             sounds.play(Cue.OPEN)
@@ -374,6 +386,7 @@ class LibraryActivity : ComponentActivity() {
 
     private fun overlayCommand(overlay: Overlay, command: Command) {
         when (overlay) {
+            is Overlay.Codes -> overlay.editor.command(command, ::close)
             is Overlay.Settings -> {
                 val indices = overlay.core?.settingIndices(overlay.perGame) ?: SETTINGS.indices
                 fun change(step: Int) {
@@ -1112,14 +1125,14 @@ class LibraryActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus && overlay !is Overlay.RomMAddress) keyFocus.requestFocus()
+        if (hasFocus && !typing) keyFocus.requestFocus()
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (MediaVolume.key(this, event)) return true
-        // The address field takes typing; controller buttons still act.
+        // Text fields take typing; controller buttons still act.
         if (
-            overlay is Overlay.RomMAddress &&
+            typing &&
                 !KeyEvent.isGamepadButton(event.keyCode) &&
                 event.keyCode != KeyEvent.KEYCODE_ESCAPE
         ) {

@@ -39,3 +39,11 @@ Lucide action icons
 Lucide Contributors and Cole Bemis · ISC license
 https://lucide.dev
 See lucide-notice.txt and lucide-license.txt.
+
+GameCube widescreen catalog
+Ralf, gamemasterplc, SuperSamus and Dolphin Wiki contributors · CC-BY-SA-3.0
+https://wiki.dolphin-emu.org/
+https://creativecommons.org/licenses/by-sa/3.0/
+Code lines unchanged; companion fixes grouped with launch settings and metadata.
+Individual source revisions and credits: assets/gamecube-widescreen.json.
+See gamecube-widescreen-notice.txt.

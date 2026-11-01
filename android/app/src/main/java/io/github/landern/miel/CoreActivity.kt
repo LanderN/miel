@@ -88,6 +88,7 @@ class CoreActivity : ComponentActivity() {
     private var discIndex = 0
     private var analogEnabled = true
     private var invertedStickAxes = emptySet<Int>()
+    private var gameCodeOptions = emptyArray<String>()
     private var fastForward = false
     private var fastForwardSettings = emptyMap<String, String>()
     private val fastForwardKey
@@ -443,6 +444,17 @@ class CoreActivity : ComponentActivity() {
                 if (!states.isDirectory && !states.mkdirs()) {
                     throw IOException("Cannot create $states")
                 }
+                if (
+                    core == Core.DOLPHIN && rom.file.extension.lowercase() !in setOf("dol", "elf")
+                ) {
+                    val disc = rom.file.inputStream().use { GameCubeDisc.read(it, rom.file.name) }
+                    gameCodeOptions =
+                        GameCodes.prepare(
+                            File(filesDir, "game-codes"),
+                            SaveStorage.gameCube(filename),
+                            disc,
+                        )
+                }
                 statePath = File(states, rom.sha256 + ".state").absolutePath
                 savePath = SaveStorage.save(core, filename).absolutePath
                 main.post {
@@ -507,6 +519,14 @@ class CoreActivity : ComponentActivity() {
                 intent.getIntExtra(EXTRA_RESOLUTION, 3),
                 intent.getBooleanExtra(EXTRA_HARDWARE_SHADERS, true),
             )
+        val options =
+            ((intent.getStringArrayExtra(EXTRA_OPTIONS) ?: core.options(settings)) +
+                    gameCodeOptions)
+                .toList()
+                .chunked(2)
+                .associate { it[0] to it[1] }
+                .flatMap { (key, value) -> listOf(key, value) }
+                .toTypedArray()
         CoreHost.start(
             library,
             rom,
@@ -522,8 +542,7 @@ class CoreActivity : ComponentActivity() {
             statePath,
             savePath,
             if (diagnostic) TEST_CORE_NAME else core.coreName,
-            if (diagnostic) emptyArray()
-            else intent.getStringArrayExtra(EXTRA_OPTIONS) ?: core.options(settings),
+            if (diagnostic) emptyArray() else options,
             core.dual,
             core.lowerInset,
             diagnostic,

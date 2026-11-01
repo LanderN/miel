@@ -69,6 +69,8 @@ sealed interface Command {
 
     object Y : Command
 
+    object GameCodes : Command
+
     object DeleteRom : Command
 
     /** Adds the selected game to Favorites, or removes it. */
@@ -222,6 +224,7 @@ class Session(private val path: File) {
             val game = game ?: return@buildList
             add(Command.Favorite)
             if (game.core != null) add(Command.Y)
+            if (game.core == Core.DOLPHIN) add(Command.GameCodes)
             add(Command.A)
             if (game.deletable) add(Command.DeleteRom)
         }

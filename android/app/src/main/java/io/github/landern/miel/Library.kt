@@ -168,6 +168,8 @@ sealed interface Overlay {
 
     data class DeleteRom(val game: Game) : Overlay
 
+    data class Codes(val editor: GameCodesEditor) : Overlay
+
     data class Update(val text: String, val action: String? = null) : Overlay
 
     data class Message(
@@ -284,6 +286,7 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
         if (session.menu && overlay == null) More(session, command)
         when (overlay) {
             is Overlay.Settings -> Settings(overlay, session, command)
+            is Overlay.Codes -> GameCodesScreen(overlay.editor, command)
             is Overlay.Message -> Message(overlay, command)
             is Overlay.Update -> Update(overlay, command)
             is Overlay.SaveAccess -> SaveAccess(command)
@@ -976,6 +979,7 @@ private fun More(session: Session, command: (Command) -> Unit) {
                                 if (session.favorite) "Remove from Favorites"
                                 else "Add to Favorites"
                             Command.Y -> "Emulator settings"
+                            Command.GameCodes -> "Game codes"
                             Command.DeleteRom ->
                                 if (game?.remote == true) "Remove download" else "Delete ROM"
                             else -> "Start fresh"
@@ -983,7 +987,8 @@ private fun More(session: Session, command: (Command) -> Unit) {
                     val icon =
                         when (action) {
                             Command.Favorite -> R.drawable.miel_action_star
-                            Command.Y -> R.drawable.miel_action_settings
+                            Command.Y,
+                            Command.GameCodes -> R.drawable.miel_action_settings
                             Command.DeleteRom -> R.drawable.miel_action_close
                             else -> R.drawable.miel_action_reload
                         }
