@@ -363,6 +363,29 @@ void upload(const void* data, unsigned w, unsigned h, size_t pitch) {
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
 }
 
+// The core's GL state that present() changes; video() restores it.
+struct PresentedState {
+    GLboolean scissor = glIsEnabled(GL_SCISSOR_TEST);
+    GLboolean colorMask[4]{};
+    GLfloat clearColor[4]{};
+    GLint drawFramebuffer = 0, readFramebuffer = 0;
+
+    PresentedState() {
+        glGetBooleanv(GL_COLOR_WRITEMASK, colorMask);
+        glGetFloatv(GL_COLOR_CLEAR_VALUE, clearColor);
+        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFramebuffer);
+        glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &readFramebuffer);
+    }
+
+    void restore() const {
+        if (scissor) glEnable(GL_SCISSOR_TEST);
+        glColorMask(colorMask[0], colorMask[1], colorMask[2], colorMask[3]);
+        glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, drawFramebuffer);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, readFramebuffer);
+    }
+};
+
 // libretro's video callback. GLES frames start at the bottom left; Vulkan and software frames
 // start at the top left. A stacked frame's top half goes up and its bottom screen goes down.
 // Single-screen frames go only to the upper display, including during surface recreation.
@@ -381,6 +404,7 @@ void video(const void* data, unsigned w, unsigned h, size_t pitch) {
     if (!hardware) upload(data, w, h, pitch);
     int top = hardware ? h : 0, bottom = hardware ? 0 : h, middle = h / 2;
     int inset = std::lround(w * lowerInset);
+    PresentedState state;
     if (stacked) {
         present(1, 0, middle, w, top);
         present(0, inset, bottom, w - inset, middle);
@@ -388,6 +412,7 @@ void video(const void* data, unsigned w, unsigned h, size_t pitch) {
         present(1, 0, bottom, w, top);
     }
     eglMakeCurrent(display, pbuffer, pbuffer, context);
+    state.restore();
 }
 
 void setupGraphics() {
