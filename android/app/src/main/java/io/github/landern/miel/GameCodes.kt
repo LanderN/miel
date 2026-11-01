@@ -69,8 +69,6 @@ object GameCodes {
                                     entry.getString("author"),
                                     entry.optString("notes"),
                                     "Source: ${entry.getString("source")}",
-                                    if (entry.optBoolean("tested_in_miel")) ""
-                                    else "Not tested in miel",
                                 )
                                 .filter(String::isNotBlank)
                                 .joinToString("\n"),
@@ -79,7 +77,10 @@ object GameCodes {
     }
 
     fun merge(saved: List<Code>, catalog: List<Code>): List<Code> =
-        saved +
+        saved.map { code ->
+            val preset = catalog.find { it.format == code.format && it.body == code.body }
+            if (code.widescreen && preset != null) code.copy(notes = preset.notes) else code
+        } +
             catalog.filter { incoming ->
                 saved.none { it.format == incoming.format && it.body == incoming.body }
             }

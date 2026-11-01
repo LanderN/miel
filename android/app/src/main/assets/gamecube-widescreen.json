@@ -65,8 +65,7 @@
       "0403D568 3863000E",
       "0403D608 3863000E"
     ],
-    "notes": "Includes the Game Boy Horror camera fix.",
-    "tested_in_miel": false
+    "notes": "Includes the Game Boy Horror camera fix."
   },
   {
     "disc_id": "GLMP01",
@@ -142,8 +141,7 @@
       "0403E9E4 3863000E",
       "0403EA84 3863000E"
     ],
-    "notes": "Includes the Game Boy Horror camera fix.",
-    "tested_in_miel": false
+    "notes": "Includes the Game Boy Horror camera fix."
   },
   {
     "disc_id": "GMSE01",
@@ -221,8 +219,7 @@
       "7C630194 7C630214",
       "60000000 00000000"
     ],
-    "notes": "May affect heat distortion.",
-    "tested_in_miel": false
+    "notes": "May affect heat distortion."
   },
   {
     "disc_id": "GMSP01",
@@ -300,8 +297,7 @@
       "7C630194 7C630214",
       "60000000 00000000"
     ],
-    "notes": "May affect heat distortion.",
-    "tested_in_miel": false
+    "notes": "May affect heat distortion."
   },
   {
     "disc_id": "GM4E01",
@@ -454,8 +450,7 @@
       "48025A50 00000000",
       "04029324 4BFDA53C"
     ],
-    "notes": "Includes menu backgrounds.",
-    "tested_in_miel": false
+    "notes": "Includes menu backgrounds."
   },
   {
     "disc_id": "GM4P01",
@@ -608,8 +603,7 @@
       "48025A50 00000000",
       "04029324 4BFDA53C"
     ],
-    "notes": "Includes menu backgrounds.",
-    "tested_in_miel": false
+    "notes": "Includes menu backgrounds."
   },
   {
     "disc_id": "GZLE01",
@@ -731,8 +725,7 @@
       "043FB77C 3FB20000",
       "043FB78C C2F60000"
     ],
-    "notes": "",
-    "tested_in_miel": false
+    "notes": ""
   },
   {
     "disc_id": "GZLP01",
@@ -880,8 +873,7 @@
       "04402FA4 3FB20000",
       "04402FB4 C2F60000"
     ],
-    "notes": "",
-    "tested_in_miel": false
+    "notes": ""
   },
   {
     "disc_id": "GZ2E01",
@@ -959,8 +951,7 @@
       "04453A30 444B0000",
       "04454840 C30A0000"
     ],
-    "notes": "",
-    "tested_in_miel": false
+    "notes": ""
   },
   {
     "disc_id": "GZ2P01",
@@ -1038,8 +1029,7 @@
       "044559F0 444B0000",
       "04456810 C30A0000"
     ],
-    "notes": "",
-    "tested_in_miel": false
+    "notes": ""
   },
   {
     "disc_id": "GM8E01",
@@ -1065,8 +1055,7 @@
       "043452A8 C342CB78",
       "045AE898 40000000"
     ],
-    "notes": "HUD remains stretched; the separate HUD mod is not included.",
-    "tested_in_miel": false
+    "notes": "HUD remains stretched; the separate HUD mod is not included."
   },
   {
     "disc_id": "GM8P01",
@@ -1085,7 +1074,6 @@
     "body": [
       "0400C754 38A00356"
     ],
-    "notes": "HUD remains stretched; the separate HUD mod is not included.",
-    "tested_in_miel": false
+    "notes": "HUD remains stretched; the separate HUD mod is not included."
   }
 ]
