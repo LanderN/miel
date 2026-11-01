@@ -1,6 +1,6 @@
 package io.github.landern.miel
 
-/** A user-facing subset of a core's libretro options. */
+/** A user-facing core or host option. */
 data class CoreOption(
     val key: String,
     val label: String,
@@ -66,6 +66,10 @@ val Core.settingOptions: List<CoreOption>
                         listOf("Automatic", "4:3", "16:9"),
                     ),
                     toggle("dolphin_widescreen_hack", "Widescreen hack"),
+                    toggle("miel_gc_invert_stick_x", "Invert main stick X"),
+                    toggle("miel_gc_invert_stick_y", "Invert main stick Y"),
+                    toggle("miel_gc_invert_cstick_x", "Invert C-stick X"),
+                    toggle("miel_gc_invert_cstick_y", "Invert C-stick Y"),
                     CoreOption(
                         "dolphin_language",
                         "System language",

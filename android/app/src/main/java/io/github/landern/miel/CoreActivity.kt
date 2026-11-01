@@ -87,6 +87,7 @@ class CoreActivity : ComponentActivity() {
     private var discCount = 0
     private var discIndex = 0
     private var analogEnabled = true
+    private var invertedStickAxes = emptySet<Int>()
     private var fastForward = false
     private var fastForwardSettings = emptyMap<String, String>()
     private val fastForwardKey
@@ -133,6 +134,21 @@ class CoreActivity : ComponentActivity() {
         reportTest = debuggable && intent.getBooleanExtra(EXTRA_REPORT_TEST, false)
         intent.getStringExtra(EXTRA_CORE)?.let { name ->
             Core.entries.firstOrNull { it.name == name }?.let { core = it }
+        }
+        if (core == Core.DOLPHIN) {
+            val options =
+                intent.getStringArrayExtra(EXTRA_OPTIONS).orEmpty().toList().chunked(2).associate {
+                    it[0] to it[1]
+                }
+            invertedStickAxes =
+                mapOf(
+                        MotionEvent.AXIS_X to "miel_gc_invert_stick_x",
+                        MotionEvent.AXIS_Y to "miel_gc_invert_stick_y",
+                        MotionEvent.AXIS_Z to "miel_gc_invert_cstick_x",
+                        MotionEvent.AXIS_RZ to "miel_gc_invert_cstick_y",
+                    )
+                    .filterValues { options[it] == "enabled" }
+                    .keys
         }
         analogEnabled =
             getSharedPreferences("controllers", MODE_PRIVATE)
@@ -946,15 +962,17 @@ class CoreActivity : ComponentActivity() {
             return super.onGenericMotionEvent(event)
         }
         rumble.select(event.device)
-        val stickX = event.getAxisValue(MotionEvent.AXIS_X)
-        val stickY = event.getAxisValue(MotionEvent.AXIS_Y)
+        fun stickAxis(axis: Int): Float =
+            event.getAxisValue(axis) * if (axis in invertedStickAxes) -1f else 1f
+        val stickX = stickAxis(MotionEvent.AXIS_X)
+        val stickY = stickAxis(MotionEvent.AXIS_Y)
         val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
         val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
         CoreHost.axes(
             stickX,
             stickY,
-            event.getAxisValue(MotionEvent.AXIS_Z),
-            event.getAxisValue(MotionEvent.AXIS_RZ),
+            stickAxis(MotionEvent.AXIS_Z),
+            stickAxis(MotionEvent.AXIS_RZ),
             if (core.stickDrivesDpad && hatX == 0f) stickX else hatX,
             if (core.stickDrivesDpad && hatY == 0f) stickY else hatY,
             if (fastForwardKey == KeyEvent.KEYCODE_BUTTON_L2) 0f
