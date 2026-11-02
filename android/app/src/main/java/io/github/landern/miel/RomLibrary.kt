@@ -190,6 +190,28 @@ class RomLibrary(
         }
     }
 
+    /**
+     * Replaces the Vibepollo apps with the host's current list in the background, keeping them when
+     * the host does not answer within a second. Skipped while a scan runs.
+     */
+    fun refreshStreams() {
+        if (!moonlight.configured || !scanning.compareAndSet(false, true)) return
+        worker.execute {
+            try {
+                val apps = moonlight.apps(connectTimeout = 1000)
+                if (closed) return@execute
+                val found =
+                    (games.filterNot(Moonlight::isGame) + apps).sortedBy { it.title.lowercase() }
+                write(found, report.substringBefore("\n\n"), report)
+                publish(games)
+            } catch (error: Exception) {
+                Log.i("MielLibrary", "Vibepollo apps not refreshed: $error")
+            } finally {
+                scanning.set(false)
+            }
+        }
+    }
+
     /** Removes a local ROM or RomM download; saves stay in place. */
     fun delete(game: Game, completed: (String?) -> Unit) {
         if (!game.deletable) return completed("This game has no local ROM file.")
@@ -390,12 +412,18 @@ class RomLibrary(
                 " and ZIP need a recognized platform folder. Other archives, CIA installers," +
                 " referenced disc tracks, hidden and empty files are skipped. Detection does not validate" +
                 " or launch a ROM."
+        if (scan.tree != null) preferences().edit().putString(TREE, scan.tree.toString()).apply()
+        write(scan.found, status, completed)
+    }
+
+    /** Saves `found` as the library with its scan `status` and `report`. */
+    private fun write(found: List<Game>, status: String, report: String) {
         val result =
             JSONObject()
-                .put("games", JSONArray(scan.found.map(::json)))
+                .put("games", JSONArray(found.map(::json)))
                 .put("status", status)
-                .put("source", scan.tree?.toString().orEmpty())
-                .put("report", completed)
+                .put("source", tree())
+                .put("report", report)
         var output: FileOutputStream? = null
         try {
             output = saved.startWrite()
@@ -405,9 +433,8 @@ class RomLibrary(
             if (output != null) saved.failWrite(output)
             throw error
         }
-        if (scan.tree != null) preferences().edit().putString(TREE, scan.tree.toString()).apply()
-        games = scan.found.toList()
-        report = completed
+        games = found.toList()
+        this.report = report
     }
 
     /** Adds the games in `document`, a folder at `folder` below the root, and its subfolders. */

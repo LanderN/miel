@@ -191,6 +191,7 @@ class LibraryActivity : ComponentActivity() {
         super.onResume()
         lowerArtwork.dim(false)
         sounds.setActive(true)
+        library.refreshStreams()
         lowerArtwork.show()
     }
 

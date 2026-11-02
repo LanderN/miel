@@ -47,9 +47,13 @@ class Moonlight(context: Context) {
         covers.deleteRecursively()
     }
 
-    /** The host's apps as PC games, with their covers saved to files. Blocking. */
-    fun apps(): List<Game> {
-        val response = JSONObject(String(get("/api/apps", LIST_LIMIT), Charsets.UTF_8))
+    /**
+     * The host's apps as PC games, with their covers saved to files. Blocking; each connection
+     * waits up to `connectTimeout` milliseconds.
+     */
+    fun apps(connectTimeout: Int = 4000): List<Game> {
+        val response =
+            JSONObject(String(get("/api/apps", LIST_LIMIT, connectTimeout), Charsets.UTF_8))
         val host = response.getString("host_uuid")
         val list = response.getJSONArray("apps")
         covers.mkdirs()
@@ -60,7 +64,7 @@ class Moonlight(context: Context) {
                 val uuid =
                     app.optString("uuid").takeIf { it.isNotEmpty() } ?: return@mapNotNull null
                 val name = app.optString("name")
-                val cover = cover(uuid, app.optString("image-version"))
+                val cover = cover(uuid, app.optString("image-version"), connectTimeout)
                 if (cover != null) kept.add(cover.name)
                 val steam = app.optString("steam-id").takeIf { it.toUIntOrNull() != null }
                 Game(
@@ -85,12 +89,12 @@ class Moonlight(context: Context) {
     }
 
     /** `uuid`'s cover at `version`, downloaded once, or null when the app has none. */
-    private fun cover(uuid: String, version: String): File? {
+    private fun cover(uuid: String, version: String, connectTimeout: Int): File? {
         val file = File(covers, "$uuid-${version.filter(Char::isLetterOrDigit)}.png")
         if (file.isFile) return file
         val bytes =
             try {
-                get("/api/apps/$uuid/cover?v=${Uri.encode(version)}", COVER_LIMIT)
+                get("/api/apps/$uuid/cover?v=${Uri.encode(version)}", COVER_LIMIT, connectTimeout)
             } catch (error: FileNotFoundException) {
                 return null
             }
@@ -98,11 +102,11 @@ class Moonlight(context: Context) {
         return file
     }
 
-    private fun get(path: String, limit: Int): ByteArray {
+    private fun get(path: String, limit: Int, connectTimeout: Int): ByteArray {
         val connection = URL(address + path).openConnection() as HttpsURLConnection
         connection.sslSocketFactory = tls.socketFactory
         connection.setHostnameVerifier { _, _ -> true }
-        connection.connectTimeout = 4000
+        connection.connectTimeout = connectTimeout
         connection.readTimeout = 8000
         connection.setRequestProperty("Authorization", "Bearer ${preferences.getString(TOKEN, "")}")
         try {
