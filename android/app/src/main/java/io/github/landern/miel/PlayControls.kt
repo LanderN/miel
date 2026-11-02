@@ -192,16 +192,16 @@ class PlayControls(
     /** Opens the disc chooser. */
     fun open() {
         if (status.count < 2 || isOpen) return
-        opened()
         highlighted = status.index.coerceIn(0, status.count - 1)
         sheet = Sheet.DISCS
+        opened()
     }
 
     private fun openSettings() {
         if (isOpen) return
-        opened()
         highlighted = 0
         sheet = Sheet.FAST_FORWARD
+        opened()
     }
 
     private fun openStates() {

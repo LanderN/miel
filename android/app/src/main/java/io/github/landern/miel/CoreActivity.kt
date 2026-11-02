@@ -86,6 +86,8 @@ class CoreActivity : ComponentActivity() {
     private lateinit var playControls: PlayControls
     private lateinit var lowerDimmer: View
 
+    /** "Paused" over the upper screen while the game is held. */
+    private lateinit var pausedLabel: TextView
     private var lowerDimmed = false
     private var lowerTouched = false
     private var lowerInteractionUntil = 0L
@@ -218,11 +220,13 @@ class CoreActivity : ComponentActivity() {
                 opened = {
                     wakeLower()
                     CoreHost.pause(true)
+                    showPaused()
                     updateStates(report())
                 },
                 dismissed = {
                     wakeLower()
                     if (resumed && !closing && !saveFailureShown && !popup) CoreHost.pause(false)
+                    showPaused()
                 },
                 insert = { CoreHost.changeDisc(it) },
                 toggleAnalog = {
@@ -280,6 +284,17 @@ class CoreActivity : ComponentActivity() {
         content.setBackgroundColor(Color.BLACK)
         upper = screen(1)
         content.addView(upper, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
+        pausedLabel =
+            TextView(this).apply {
+                text = "Paused"
+                textSize = 32f
+                typeface = resources.getFont(R.font.nunito_extrabold)
+                setTextColor(Color.WHITE)
+                setBackgroundColor(0x99303638.toInt())
+                gravity = Gravity.CENTER
+                visibility = View.GONE
+            }
+        content.addView(pausedLabel, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         setContentView(content)
         displayListener.register()
         attachLower()
@@ -762,12 +777,17 @@ class CoreActivity : ComponentActivity() {
         if (show == popup || (show && (closing || saveFailureShown))) return
         popup = show
         wakeLower()
+        showPaused()
         if (appBelow) {
             if (show) lower?.show() else lower?.hide()
         } else playControls.visibility = if (show) View.VISIBLE else View.GONE
         if (show) CoreHost.pause(true)
         else if (resumed && !closing && !saveFailureShown && !playControls.isOpen)
             CoreHost.pause(false)
+    }
+
+    private fun showPaused() {
+        pausedLabel.visibility = if (holding && !closing) View.VISIBLE else View.GONE
     }
 
     private fun wakeLower() {
