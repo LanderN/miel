@@ -88,6 +88,7 @@ class PlayControls(
     /** Lists the apps Open app offers, or null when the game needs the lower screen. */
     private val apps: (() -> List<AppChoice>)?,
     private val openApp: (InstalledApp) -> Unit,
+    private val closeApp: () -> Unit,
 ) : AbstractComposeView(context) {
     private enum class Sheet {
         DISCS,
@@ -115,6 +116,8 @@ class PlayControls(
         val fastForwarding: Boolean = false,
         val played: String = "",
         val battery: String = "",
+        /** An app opened from Open app holds the lower screen. */
+        val appBelow: Boolean = false,
     )
 
     private var status by mutableStateOf(Status())
@@ -156,6 +159,7 @@ class PlayControls(
         analogEnabled: Boolean,
         fastForwarding: Boolean,
         played: Long,
+        appBelow: Boolean,
     ) {
         visibility = if (ready) VISIBLE else GONE
         var battery = status.battery
@@ -179,6 +183,7 @@ class PlayControls(
                 fastForwarding,
                 "${PlayTime.duration(played)} played",
                 battery,
+                appBelow,
             )
     }
 
@@ -374,6 +379,8 @@ class PlayControls(
                     paper.copy(alpha = .8f),
                     Miel.textBody,
                 )
+                if (status.appBelow)
+                    Pill(null, "Close app", minWidth = 0.dp, primary = false) { closeApp() }
                 Pill(null, "Library", minWidth = 0.dp, primary = false) { leave() }
                 if (status.popup) Pill("B", "Resume", minWidth = 0.dp) { resume() }
             }

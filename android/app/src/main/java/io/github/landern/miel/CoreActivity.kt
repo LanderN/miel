@@ -271,6 +271,7 @@ class CoreActivity : ComponentActivity() {
                             }
                         }),
                 openApp = ::openAppBelow,
+                closeApp = ::closeAppBelow,
             )
         lowerRoot.addView(playControls, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         lowerDimmer =
@@ -661,6 +662,7 @@ class CoreActivity : ComponentActivity() {
             analogEnabled,
             fastForward,
             played + unsavedPlay,
+            appBelow,
         )
         updateStates(info)
         val checkpoints = info.optInt("checkpoints")
@@ -780,7 +782,7 @@ class CoreActivity : ComponentActivity() {
         showPaused()
         if (appBelow) {
             if (show) lower?.show() else lower?.hide()
-        } else playControls.visibility = if (show) View.VISIBLE else View.GONE
+        } else if (core.dual) playControls.visibility = if (show) View.VISIBLE else View.GONE
         if (show) CoreHost.pause(true)
         else if (resumed && !closing && !saveFailureShown && !playControls.isOpen)
             CoreHost.pause(false)
@@ -966,6 +968,14 @@ class CoreActivity : ComponentActivity() {
         appBelow = true
         reclaimFocus = true
         if (popup) showPopup(false) else lower?.hide()
+    }
+
+    /** Gives the lower screen back to PlayControls and resumes; the app stays behind them. */
+    private fun closeAppBelow() {
+        if (!appBelow) return
+        appBelow = false
+        lower?.show()
+        showPopup(false)
     }
 
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
