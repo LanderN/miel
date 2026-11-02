@@ -59,7 +59,15 @@ class LibraryActivity : ComponentActivity() {
     private lateinit var artwork: ArtworkCache
     private lateinit var library: RomLibrary
     private lateinit var apps: AppList
-    private val lowerArtwork = LowerArtwork(this)
+    private val lowerArtwork =
+        LowerArtwork(this) { context ->
+            AppSwitcher(
+                context,
+                { apps.apps },
+                { image(apps.iconPath(it.id)) },
+                { launchApp(it, Screen.BOTTOM) },
+            )
+        }
     private val displayListener = Displays.Listener(this) { lowerArtwork.show() }
     private var overlay by mutableStateOf<Overlay?>(null)
     private val typing: Boolean
@@ -1135,21 +1143,29 @@ class LibraryActivity : ComponentActivity() {
     private fun openApp(other: Boolean) {
         val app = session.app ?: return
         val screen = if (other) session.appScreen.other() else session.appScreen
+        if (!launchApp(app, screen)) return
+        session.rememberScreen(screen)
+        sounds.play(Cue.CONFIRM)
+    }
+
+    /** Opens `app` on `screen`; returns false after showing why it could not. */
+    private fun launchApp(app: InstalledApp, screen: Screen): Boolean {
         val component =
-            ComponentName.unflattenFromString(app.id) ?: return fail("Cannot open this app.")
+            ComponentName.unflattenFromString(app.id)
+                ?: return false.also { fail("Cannot open this app.") }
         val intent =
             Intent.makeMainActivity(component)
                 .addFlags(
                     Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED,
                 )
         if (packageManager.resolveActivity(intent, 0) == null) {
-            return fail("${app.label} is no longer installed.")
+            return false.also { fail("${app.label} is no longer installed.") }
         }
         val display =
             if (screen == Screen.TOP) Display.DEFAULT_DISPLAY
             else
                 Displays.other(this, Display.DEFAULT_DISPLAY)?.displayId
-                    ?: return fail("The bottom screen is unavailable.")
+                    ?: return false.also { fail("The bottom screen is unavailable.") }
         if (screen == Screen.BOTTOM) lowerArtwork.yieldToApp()
         try {
             startActivity(
@@ -1158,10 +1174,9 @@ class LibraryActivity : ComponentActivity() {
             )
         } catch (error: RuntimeException) {
             Log.w(Displays.TAG, "Opening $component failed", error)
-            return fail("Android could not open ${app.label}.")
+            return false.also { fail("Android could not open ${app.label}.") }
         }
-        session.rememberScreen(screen)
-        sounds.play(Cue.CONFIRM)
+        return true
     }
 
     /** Searches HowLongToBeat for `game` once it stays selected, unless it was looked up. */
