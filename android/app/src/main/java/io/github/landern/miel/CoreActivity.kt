@@ -1,10 +1,13 @@
 package io.github.landern.miel
 
+import android.app.ActivityOptions
 import android.app.AlertDialog
 import android.app.Presentation
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.media.AudioManager
 import android.net.Uri
@@ -31,6 +34,7 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import java.io.File
@@ -81,6 +85,7 @@ class CoreActivity : ComponentActivity() {
     private var lastStatus = ""
     private lateinit var playControls: PlayControls
     private lateinit var lowerDimmer: View
+
     private var lowerDimmed = false
     private var lowerTouched = false
     private var lowerInteractionUntil = 0L
@@ -101,8 +106,20 @@ class CoreActivity : ComponentActivity() {
                 else -> KeyEvent.KEYCODE_UNKNOWN
             }
 
-    /** Back shows PlayControls over a dual-screen game's lower screen, paused. */
+    /**
+     * Back shows PlayControls, paused, over a dual-screen game's lower screen or the app opened on
+     * the lower screen.
+     */
     private var popup = false
+
+    /** An app opened from PlayControls holds the lower screen; PlayControls' window is hidden. */
+    private var appBelow = false
+
+    /**
+     * Set while an app opens below. The game's task returns to the front when it loses focus then,
+     * or while PlayControls show over the app.
+     */
+    private var reclaimFocus = false
     private var ready = false
 
     /** The game stays paused while the disc chooser or the popup is open. */
@@ -237,6 +254,19 @@ class CoreActivity : ComponentActivity() {
                 },
                 leave = ::returnToLibrary,
                 resume = { showPopup(false) },
+                apps =
+                    if (core.dual) null
+                    else
+                        ({
+                            AppList.launchable(this).map {
+                                PlayControls.AppChoice(
+                                    AppList.installed(it),
+                                    BitmapFactory.decodeFile(AppList.icon(this, it).path)
+                                        ?.asImageBitmap(),
+                                )
+                            }
+                        }),
+                openApp = ::openAppBelow,
             )
         lowerRoot.addView(playControls, FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT))
         lowerDimmer =
@@ -335,6 +365,7 @@ class CoreActivity : ComponentActivity() {
             presentation.window?.let(Displays::immersive)
             lower = presentation
             presentation.show()
+            if (appBelow && !popup) presentation.hide()
         } catch (error: RuntimeException) {
             Log.e(Displays.TAG, "Lower game screen failed", error)
             lower = null
@@ -731,7 +762,9 @@ class CoreActivity : ComponentActivity() {
         if (show == popup || (show && (closing || saveFailureShown))) return
         popup = show
         wakeLower()
-        playControls.visibility = if (show) View.VISIBLE else View.GONE
+        if (appBelow) {
+            if (show) lower?.show() else lower?.hide()
+        } else playControls.visibility = if (show) View.VISIBLE else View.GONE
         if (show) CoreHost.pause(true)
         else if (resumed && !closing && !saveFailureShown && !playControls.isOpen)
             CoreHost.pause(false)
@@ -886,9 +919,52 @@ class CoreActivity : ComponentActivity() {
             startActivity(
                 Intent(this, LaunchActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    .putExtra(LaunchActivity.AFTER_GAME, true),
+                    .putExtra(LaunchActivity.AFTER_GAME, true)
+                    .putExtra(LaunchActivity.APP_BELOW, appBelow),
             )
         }
+    }
+
+    /**
+     * Opens `app` on the lower screen in place of PlayControls, keeping the controller on the game.
+     */
+    private fun openAppBelow(app: InstalledApp) {
+        val component = ComponentName.unflattenFromString(app.id) ?: return
+        val display = lower?.display?.displayId ?: return
+        try {
+            startActivity(
+                Intent.makeMainActivity(component)
+                    .addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED,
+                    ),
+                ActivityOptions.makeBasic().setLaunchDisplayId(display).toBundle(),
+            )
+        } catch (error: RuntimeException) {
+            Log.w(Displays.TAG, "Opening $component failed", error)
+            return
+        }
+        appBelow = true
+        reclaimFocus = true
+        if (popup) showPopup(false) else lower?.hide()
+    }
+
+    override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
+        super.onTopResumedActivityChanged(isTopResumedActivity)
+        if (isTopResumedActivity || !(reclaimFocus || (appBelow && popup))) return
+        reclaimFocus = false
+        main.postDelayed(::focusGame, 300)
+    }
+
+    /** Restarts this activity on its display, which gives that display the controller's input. */
+    private fun focusGame() {
+        if (closing || destroyed) return
+        startActivity(
+            Intent(this, CoreActivity::class.java)
+                .addFlags(
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT,
+                ),
+            ActivityOptions.makeBasic().setLaunchDisplayId(Displays.own(this)).toBundle(),
+        )
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -900,7 +976,7 @@ class CoreActivity : ComponentActivity() {
     override fun onBackPressed() {
         when {
             playControls.isOpen -> playControls.close()
-            core.dual && !diagnostic && ready && !closing -> showPopup(!popup)
+            (core.dual || appBelow) && !diagnostic && ready && !closing -> showPopup(!popup)
             else -> returnToLibrary()
         }
     }

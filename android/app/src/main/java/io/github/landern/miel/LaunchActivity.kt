@@ -18,6 +18,9 @@ class LaunchActivity : Activity() {
         /** Set by a finishing game, which may still be the top task when the library opens. */
         const val AFTER_GAME = "afterGame"
 
+        /** Set by a finishing game that left an app on the lower display. */
+        const val APP_BELOW = "appBelow"
+
         fun openLibrary(caller: Activity, source: Intent) {
             // A running game first finishes its checkpoint and retry flow, then returns here.
             if (!source.getBooleanExtra(AFTER_GAME, false) && Displays.gameRunning(caller)) {
@@ -35,6 +38,7 @@ class LaunchActivity : Activity() {
                         CoreActivity.EXTRA_DEBUG_REPORTS,
                         source.getBooleanExtra(CoreActivity.EXTRA_DEBUG_REPORTS, false),
                     )
+                    .putExtra(APP_BELOW, source.getBooleanExtra(APP_BELOW, false))
             caller.startActivity(
                 library,
                 ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY).toBundle(),

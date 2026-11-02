@@ -301,6 +301,12 @@ void updateWindows() {
     dual = useVulkan ? vulkan.visible(1) : outputs[1].surface != EGL_NO_SURFACE;
 }
 
+// Whether either screen has a surface to show frames on.
+bool shown() {
+    if (useVulkan) return vulkan.visible(0) || vulkan.visible(1);
+    return outputs[0].surface != EGL_NO_SURFACE || outputs[1].surface != EGL_NO_SURFACE;
+}
+
 // Scales the framebuffer rectangle (x0, y0)-(x1, y1) onto a screen, letterboxed.
 void present(int slot, int x0, int y0, int x1, int y1) {
     Output& output = outputs[slot];
@@ -1262,9 +1268,8 @@ void loop(const Launch& launch, double fps) {
         }
         updateWindows();
         if (!useVulkan) eglMakeCurrent(display, pbuffer, pbuffer, context);
-        bool periodic = launch.diagnostic && ready && !paused &&
-                        (useVulkan ? vulkan.visible(0) : outputs[0].surface != EGL_NO_SURFACE) &&
-                        Clock::now() >= checkpointDue;
+        bool periodic =
+            launch.diagnostic && ready && !paused && shown() && Clock::now() >= checkpointDue;
         if (writing.valid() &&
             writing.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             bool ok = writing.get();
@@ -1328,8 +1333,7 @@ void loop(const Launch& launch, double fps) {
         }
         // The bootstrap frames run even while paused or hidden: a Home pressed during loading
         // must never save over a session that has not been restored.
-        if (ready &&
-            (paused || (useVulkan ? !vulkan.visible(0) : outputs[0].surface == EGL_NO_SURFACE))) {
+        if (ready && (paused || !shown())) {
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
             next = lastFrame = Clock::now();
             continue;

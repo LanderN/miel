@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -68,8 +69,8 @@ import kotlinx.coroutines.delay
 
 /**
  * The lower screen during single-screen play: the game's art, title and play time, the time and
- * battery, and fast-forward, Library, PlayStation controller and disc controls. Disc, fast-forward
- * and save-state controls open as sheets over it.
+ * battery, and fast-forward, Library, PlayStation controller and disc controls. Disc, fast-forward,
+ * save-state and app controls open as sheets over it.
  */
 class PlayControls(
     context: Context,
@@ -84,12 +85,22 @@ class PlayControls(
     private val stateAction: (slot: Int, load: Boolean) -> Unit,
     private val leave: () -> Unit,
     private val resume: () -> Unit,
+    /** Lists the apps Open app offers, or null when the game needs the lower screen. */
+    private val apps: (() -> List<AppChoice>)?,
+    private val openApp: (InstalledApp) -> Unit,
 ) : AbstractComposeView(context) {
     private enum class Sheet {
         DISCS,
         FAST_FORWARD,
         STATES,
+        APPS,
     }
+
+    /** Columns of the Open app grid. */
+    private val APP_GRID_COLUMNS = 4
+
+    /** An app Open app offers, with its icon when it has one. */
+    class AppChoice(val app: InstalledApp, val icon: ImageBitmap?)
 
     /** Slot 0 is Auto save; slots 1–5 are manual. A zero timestamp denotes an empty slot. */
     data class StateSlot(val index: Int, val modified: Long)
@@ -115,6 +126,7 @@ class PlayControls(
     private var stateBusy by mutableStateOf(false)
     private var stateMessage by mutableStateOf("")
     private var stateConfirmation by mutableStateOf<Boolean?>(null)
+    private var appChoices by mutableStateOf(emptyList<AppChoice>())
     private var batteryAt = 0L
     private val paper = Color(0xFFFFFEF8)
 
@@ -200,6 +212,21 @@ class PlayControls(
         opened()
     }
 
+    private fun openApps() {
+        if (isOpen) return
+        appChoices = apps?.invoke().orEmpty()
+        highlighted = 0
+        sheet = Sheet.APPS
+        opened()
+    }
+
+    /** Closes the sheet, then opens the highlighted app on the lower screen. */
+    private fun chooseApp() {
+        val choice = appChoices.getOrNull(highlighted) ?: return
+        close()
+        openApp(choice.app)
+    }
+
     fun close() {
         if (!isOpen || stateBusy) return
         stateConfirmation = null
@@ -227,12 +254,27 @@ class PlayControls(
                 Sheet.DISCS -> status.count
                 Sheet.FAST_FORWARD -> FAST_FORWARD_OPTIONS.size
                 Sheet.STATES -> stateSlots.size
-            }
+                Sheet.APPS -> appChoices.size
+            }.coerceAtLeast(1)
+        val grid = sheet == Sheet.APPS
         when (event.keyCode) {
-            KeyEvent.KEYCODE_DPAD_UP -> highlighted = (highlighted - 1 + rows) % rows
-            KeyEvent.KEYCODE_DPAD_DOWN -> highlighted = (highlighted + 1) % rows
-            KeyEvent.KEYCODE_DPAD_LEFT -> if (sheet == Sheet.FAST_FORWARD) step(-1)
-            KeyEvent.KEYCODE_DPAD_RIGHT -> if (sheet == Sheet.FAST_FORWARD) step(1)
+            KeyEvent.KEYCODE_DPAD_UP ->
+                highlighted =
+                    if (grid)
+                        (highlighted - APP_GRID_COLUMNS).coerceAtLeast(
+                            highlighted % APP_GRID_COLUMNS,
+                        )
+                    else (highlighted - 1 + rows) % rows
+            KeyEvent.KEYCODE_DPAD_DOWN ->
+                highlighted =
+                    if (grid) (highlighted + APP_GRID_COLUMNS).takeIf { it < rows } ?: highlighted
+                    else (highlighted + 1) % rows
+            KeyEvent.KEYCODE_DPAD_LEFT ->
+                if (grid) highlighted = (highlighted - 1).coerceAtLeast(0)
+                else if (sheet == Sheet.FAST_FORWARD) step(-1)
+            KeyEvent.KEYCODE_DPAD_RIGHT ->
+                if (grid) highlighted = (highlighted + 1).coerceAtMost(rows - 1)
+                else if (sheet == Sheet.FAST_FORWARD) step(1)
             KeyEvent.KEYCODE_BUTTON_A,
             KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_ENTER ->
@@ -241,6 +283,7 @@ class PlayControls(
                         Sheet.DISCS -> insert()
                         Sheet.FAST_FORWARD -> close()
                         Sheet.STATES -> requestState(load = true)
+                        Sheet.APPS -> chooseApp()
                     }
             KeyEvent.KEYCODE_BUTTON_X ->
                 if (first && sheet == Sheet.STATES) requestState(load = false)
@@ -310,6 +353,7 @@ class PlayControls(
                 Sheet.DISCS -> Discs()
                 Sheet.FAST_FORWARD -> FastForward()
                 Sheet.STATES -> States()
+                Sheet.APPS -> Apps()
             }
         }
     }
@@ -446,6 +490,26 @@ class PlayControls(
                             FontWeight.SemiBold,
                         )
                         Chevron(Miel.muted)
+                    }
+                }
+                if (apps != null) {
+                    Pressable(Modifier.fillMaxWidth(), ::openApps) { pressed ->
+                        Row(
+                            Modifier.fillMaxWidth()
+                                .heightIn(min = 56.dp)
+                                .controlSurface(RoundedCornerShape(14.dp), Miel.button, pressed)
+                                .padding(horizontal = Miel.inset),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "Open app",
+                                Modifier.weight(1f),
+                                Miel.ink,
+                                Miel.textBody,
+                                FontWeight.SemiBold,
+                            )
+                            Chevron(Miel.muted)
+                        }
                     }
                 }
             }
@@ -651,6 +715,67 @@ class PlayControls(
                         "${DateFormat.getDateFormat(context).format(date)} · ${DateFormat.getTimeFormat(context).format(date)}"
                     }
                 Text(modified, color = Miel.muted, size = Miel.textSmall)
+            }
+        }
+    }
+
+    @Composable
+    private fun Apps() {
+        Sheet(
+            "Open app",
+            footer = {
+                Pill("B", "Cancel", primary = false) { close() }
+                Pill("A", "Open") { chooseApp() }
+            },
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(Miel.spaceSm)) {
+                appChoices.withIndex().chunked(APP_GRID_COLUMNS).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(Miel.spaceSm)) {
+                        row.forEach { (index, choice) -> AppTile(choice, index) }
+                        repeat(APP_GRID_COLUMNS - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun RowScope.AppTile(choice: AppChoice, index: Int) {
+        val chosen = index == highlighted
+        val intoView = remember { BringIntoViewRequester() }
+        LaunchedEffect(chosen) { if (chosen) intoView.bringIntoView() }
+        Box(Modifier.weight(1f).aspectRatio(1f).bringIntoViewRequester(intoView)) {
+            Tile(
+                chosen,
+                Miel.surface,
+                {
+                    highlighted = index
+                    chooseApp()
+                },
+                border = true,
+            ) {
+                Column(
+                    Modifier.fillMaxSize().padding(Miel.spaceSm),
+                    verticalArrangement =
+                        Arrangement.spacedBy(Miel.spaceXs, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    if (choice.icon != null) Image(choice.icon, null, Modifier.size(56.dp))
+                    else
+                        Image(
+                            painterResource(R.drawable.miel_unknown),
+                            null,
+                            Modifier.size(56.dp),
+                        )
+                    Text(
+                        choice.app.label,
+                        color = if (chosen) Miel.ink else Miel.muted,
+                        size = Miel.textSmall,
+                        weight = FontWeight.SemiBold,
+                        align = TextAlign.Center,
+                        lines = 1,
+                    )
+                }
             }
         }
     }

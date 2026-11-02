@@ -698,7 +698,7 @@ private fun ColumnScope.AppGrid(session: Session, art: Art, command: (Command) -
 
 /** A flat artwork tile with an outlined, gently enlarged selection. */
 @Composable
-private fun Tile(
+internal fun Tile(
     chosen: Boolean,
     background: Color,
     onClick: () -> Unit,

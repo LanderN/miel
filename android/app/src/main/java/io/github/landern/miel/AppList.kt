@@ -70,21 +70,13 @@ class AppList(
     }
 
     private fun load() {
-        val collator = Collator.getInstance()
-        val activities =
-            launcher
-                .getActivityList(null, Process.myUserHandle())
-                .filter { it.componentName.packageName != context.packageName }
-                .sortedWith { a, b -> collator.compare(label(a), label(b)) }
+        val activities = launchable(context)
         val list = ArrayList<InstalledApp>()
         val paths = HashMap<String, String>()
-        icons.mkdirs()
         for (info in activities) {
-            val id = info.componentName.flattenToShortString()
-            list.add(InstalledApp(id, label(info)))
-            val icon = File(icons, iconName(info))
-            if (!icon.isFile) writeIcon(info, icon)
-            paths[id] = icon.path
+            val app = installed(info)
+            list.add(app)
+            paths[app.id] = icon(context, info).path
         }
         icons.listFiles()?.forEach { if (!paths.containsValue(it.path)) it.delete() }
         iconPaths = paths
@@ -110,19 +102,37 @@ class AppList(
         replacing: Boolean,
     ) = refresh()
 
-    private companion object {
-        const val TAG = "MielApps"
-        const val ICON_SIZE = 192
+    companion object {
+        private const val TAG = "MielApps"
+        private const val ICON_SIZE = 192
 
-        fun label(info: LauncherActivityInfo) = info.label.toString()
+        /** Every launcher activity of this user except miel's, sorted by label. */
+        fun launchable(context: Context): List<LauncherActivityInfo> {
+            val collator = Collator.getInstance()
+            return context
+                .getSystemService(LauncherApps::class.java)
+                .getActivityList(null, Process.myUserHandle())
+                .filter { it.componentName.packageName != context.packageName }
+                .sortedWith { a, b -> collator.compare(a.label.toString(), b.label.toString()) }
+        }
+
+        /** `info`'s icon as a PNG in the cache, drawn when missing. */
+        fun icon(context: Context, info: LauncherActivityInfo): File {
+            val file = File(File(context.cacheDir, "app-icons").apply { mkdirs() }, iconName(info))
+            if (!file.isFile) writeIcon(info, file)
+            return file
+        }
+
+        fun installed(info: LauncherActivityInfo) =
+            InstalledApp(info.componentName.flattenToShortString(), info.label.toString())
 
         /** Changes with the activity and with every install of its app. */
-        fun iconName(info: LauncherActivityInfo): String {
+        private fun iconName(info: LauncherActivityInfo): String {
             val key = info.componentName.flattenToString() + "\n" + info.applicationInfo.sourceDir
             return "${UUID.nameUUIDFromBytes(key.toByteArray())}.png"
         }
 
-        fun writeIcon(info: LauncherActivityInfo, file: File) {
+        private fun writeIcon(info: LauncherActivityInfo, file: File) {
             val drawable = info.getIcon(DisplayMetrics.DENSITY_XXXHIGH)
             val bitmap = Bitmap.createBitmap(ICON_SIZE, ICON_SIZE, Bitmap.Config.ARGB_8888)
             drawable.setBounds(0, 0, ICON_SIZE, ICON_SIZE)

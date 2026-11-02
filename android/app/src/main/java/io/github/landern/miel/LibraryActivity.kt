@@ -177,13 +177,15 @@ class LibraryActivity : ComponentActivity() {
         // Leaving touch mode consumes the first navigation key unless a plain View holds focus.
         addContentView(keyFocus, ViewGroup.LayoutParams(1, 1))
         displayListener.register()
+        if (intent.getBooleanExtra(LaunchActivity.APP_BELOW, false)) lowerArtwork.yieldToApp()
         lowerArtwork.show()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        lowerArtwork.reclaim()
+        if (intent.getBooleanExtra(LaunchActivity.APP_BELOW, false)) lowerArtwork.yieldToApp()
+        else lowerArtwork.reclaim()
         lowerArtwork.show()
     }
 
