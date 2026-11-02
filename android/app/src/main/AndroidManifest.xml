@@ -12,6 +12,8 @@
     <!-- The Apps tab lists every launcher activity. -->
     <queries>
         <package android:name="com.droiddeck.launcher" />
+        <package android:name="com.limelight.noir" />
+        <package android:name="com.limelight" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />

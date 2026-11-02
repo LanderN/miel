@@ -61,6 +61,8 @@ internal fun settingsDetail(overlay: Overlay.Settings, session: Session): Settin
             "Rescan folder" -> "Scan the ROM folder and paired RomM server for games."
             "Scan report" -> "Show the results of the library scan."
             "RomM" -> "Pair with a RomM server to browse its games and sync in-game saves."
+            "Moonlight" ->
+                "List a Vibepollo host’s apps under PC and stream them with Moonlight or Artemis."
             "Redownload metadata" -> "Clear cached artwork and metadata lookups, then rescan."
             "Remove downloaded art" ->
                 "Remove cached covers and screenshots. Local artwork stays in place."

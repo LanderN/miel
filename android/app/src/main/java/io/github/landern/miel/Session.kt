@@ -431,7 +431,7 @@ class Session(private val path: File) {
             }
             inMore && command == Command.Favorite -> toggleFavorite()
             !menu && command is Command.Pick && command.index in order -> selected = command.index
-            command == Command.X && game?.let(DroidDeck::isGame) != true -> {
+            command == Command.X && game?.external != true -> {
                 menu = !menu
                 confirm = false
                 moreRow = 0

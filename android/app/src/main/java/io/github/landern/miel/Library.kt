@@ -149,12 +149,13 @@ val SETTINGS =
         "Rescan folder",
         "Scan report",
         "RomM",
+        "Moonlight",
         "Redownload metadata",
     ) +
         Core.entries.map { it.displayName } +
         listOf("Remove downloaded art", "Set as default launcher", "miel updates", "Licenses")
 
-const val CORE_SETTINGS_START = 6
+const val CORE_SETTINGS_START = 7
 
 /** A dialog over the library that is not part of the session. */
 sealed interface Overlay {
@@ -185,6 +186,13 @@ sealed interface Overlay {
     data class RomMPairing(val code: String, val link: String, val qr: ImageBitmap) : Overlay
 
     data class RomMPaired(val server: String) : Overlay
+
+    /** The Vibepollo host's address and API token; `configured` when one is stored. */
+    data class Moonlight(
+        val configured: Boolean,
+        val address: TextFieldState,
+        val token: TextFieldState = TextFieldState(),
+    ) : Overlay
 
     /** A game's in-game save changed here and on RomM since they last synced. */
     data class SaveConflict(val title: String, val here: String, val romm: String) : Overlay
@@ -232,7 +240,7 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
                 Modifier.fillMaxWidth().height(Miel.control),
                 horizontalArrangement = Arrangement.spacedBy(Miel.spaceSm),
             ) {
-                if (total > 0 && (apps || session.game?.let(DroidDeck::isGame) != true)) {
+                if (total > 0 && (apps || session.game?.external != true)) {
                     Pill(
                         "X",
                         if (apps) session.appScreen.other().label else "More",
@@ -269,7 +277,7 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
                             apps -> "Open"
                             total == 0 && session.games.isNotEmpty() -> "Browse games"
                             total == 0 -> "Choose ROM folder"
-                            session.game?.let(DroidDeck::isGame) == true -> "Play"
+                            session.game?.external == true -> "Play"
                             session.launched -> "Continue"
                             else -> "Play"
                         },
@@ -294,6 +302,7 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
             is Overlay.RomMAddress -> RomMAddress(overlay, command)
             is Overlay.RomMPairing -> RomMPairing(overlay, command)
             is Overlay.RomMPaired -> RomMPaired(overlay, command)
+            is Overlay.Moonlight -> Moonlight(overlay, command)
             is Overlay.SaveConflict -> SaveConflict(overlay, command)
             null -> {}
         }
@@ -594,6 +603,27 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
                             style =
                                 Stroke(1.8f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round),
                         )
+                    }
+                }
+            }
+            if (Moonlight.isGame(game)) {
+                Box(
+                    Modifier.padding(Miel.spaceSm)
+                        .size(26.dp)
+                        .background(Miel.cream.copy(alpha = .92f), CircleShape)
+                        .semantics { contentDescription = "Streamed with Moonlight" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Canvas(Modifier.size(16.dp)) {
+                        val unit = size.width / 24f
+                        val play =
+                            Path().apply {
+                                moveTo(8f * unit, 5f * unit)
+                                lineTo(19f * unit, 12f * unit)
+                                lineTo(8f * unit, 19f * unit)
+                                close()
+                            }
+                        drawPath(play, Miel.keyInk)
                     }
                 }
             }
@@ -1345,6 +1375,48 @@ private fun RomMAddress(overlay: Overlay.RomMAddress, command: (Command) -> Unit
             onKeyboardAction = { command(Command.A) },
         )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Miel.inset)) {
+            Pill("B", "Cancel", primary = false, fill = true) { command(Command.B) }
+            Pill("A", "Connect", fill = true) { command(Command.A) }
+        }
+    }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+}
+
+@Composable
+private fun Moonlight(overlay: Overlay.Moonlight, command: (Command) -> Unit) {
+    val focus = remember { FocusRequester() }
+    @Composable
+    fun Field(state: TextFieldState, modifier: Modifier, last: Boolean) =
+        BasicTextField(
+            state,
+            modifier
+                .fillMaxWidth()
+                .relief(RoundedCornerShape(Miel.inset), Miel.surface, inset = true)
+                .border(2.dp, Miel.ring, RoundedCornerShape(Miel.inset))
+                .padding(Miel.inset),
+            textStyle = TextStyle(color = Miel.ink, fontSize = Miel.textBody),
+            lineLimits = TextFieldLineLimits.SingleLine,
+            keyboardOptions =
+                KeyboardOptions(
+                    keyboardType = if (last) KeyboardType.Password else KeyboardType.Uri,
+                    imeAction = if (last) ImeAction.Go else ImeAction.Next,
+                ),
+            onKeyboardAction = if (last) ({ command(Command.A) }) else null,
+        )
+    Dialog("Moonlight") {
+        Text("Vibepollo address", color = Miel.muted, size = Miel.textBody)
+        Field(overlay.address, Modifier.focusRequester(focus), last = false)
+        Text(
+            if (overlay.configured) "API token (blank keeps the saved one)" else "API token",
+            color = Miel.muted,
+            size = Miel.textBody,
+        )
+        Field(overlay.token, Modifier, last = true)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Miel.inset)) {
+            if (overlay.configured)
+                Pill("X", "Forget", primary = false, destructive = true, fill = true) {
+                    command(Command.X)
+                }
             Pill("B", "Cancel", primary = false, fill = true) { command(Command.B) }
             Pill("A", "Connect", fill = true) { command(Command.A) }
         }

@@ -25,6 +25,7 @@ import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -63,7 +64,9 @@ class LibraryActivity : ComponentActivity() {
     private var overlay by mutableStateOf<Overlay?>(null)
     private val typing: Boolean
         get() =
-            overlay is Overlay.RomMAddress || (overlay as? Overlay.Codes)?.editor?.editing == true
+            overlay is Overlay.RomMAddress ||
+                overlay is Overlay.Moonlight ||
+                (overlay as? Overlay.Codes)?.editor?.editing == true
 
     private val keyFocus by lazy { View(this).apply { isFocusableInTouchMode = true } }
 
@@ -75,6 +78,7 @@ class LibraryActivity : ComponentActivity() {
     private var activeDirection: Command? = null
     private var directionRepeat: Job? = null
     private lateinit var romm: RomM
+    private val moonlight by lazy { Moonlight(applicationContext) }
     private val updates by lazy { AppUpdates(applicationContext) }
     private var updateRelease: AppUpdates.Release? = null
     private val updatePermission =
@@ -326,7 +330,14 @@ class LibraryActivity : ComponentActivity() {
         if (command == Command.A && session.tab != Tab.APPS) {
             val game = session.game ?: return
             if (!game.playable) return fail(UNPLAYABLE)
-            if (DroidDeck.isGame(game)) return openDroidDeck(game)
+            if (DroidDeck.isGame(game))
+                return openExternal(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(game.romUri))
+                        .setClassName(DroidDeck.PACKAGE, "${DroidDeck.PACKAGE}.MainActivity"),
+                    "DroidDeck",
+                )
+            if (Moonlight.isGame(game))
+                return openExternal(Moonlight.launch(game, packageManager), "Moonlight")
             if (!session.menu || session.confirm) return syncAndStart(game)
         }
         if (
@@ -496,6 +507,18 @@ class LibraryActivity : ComponentActivity() {
                     else -> {}
                 }
             is Overlay.RomMPairing -> if (command == Command.B) close()
+            is Overlay.Moonlight ->
+                when (command) {
+                    Command.A -> connectMoonlight(overlay)
+                    Command.X ->
+                        if (overlay.configured) {
+                            moonlight.forget()
+                            close()
+                            rescan()
+                        }
+                    Command.B -> close()
+                    else -> {}
+                }
             is Overlay.RomMPaired ->
                 when (command) {
                     Command.Y -> pair(overlay.server)
@@ -594,7 +617,9 @@ class LibraryActivity : ComponentActivity() {
         when (SETTINGS[choice]) {
             "Choose ROM folder" -> chooseFolder()
             "Rescan folder" ->
-                if (library.tree().isEmpty() && !romm.paired) chooseFolder() else rescan()
+                if (library.tree().isEmpty() && !romm.paired && !moonlight.configured)
+                    chooseFolder()
+                else rescan()
             "Scan report" -> showMessage("Scan report", library.report())
             "Redownload metadata" -> {
                 if (library.busy()) return showMessage("Finding your games", library.report())
@@ -627,6 +652,8 @@ class LibraryActivity : ComponentActivity() {
             "RomM" ->
                 overlay =
                     if (romm.paired) Overlay.RomMPaired(romm.server) else Overlay.RomMAddress()
+            "Moonlight" ->
+                overlay = Overlay.Moonlight(moonlight.configured, TextFieldState(moonlight.address))
             "Set as default launcher" -> chooseDefaultLauncher()
             "miel updates" -> checkUpdates()
             "Licenses" ->
@@ -725,6 +752,25 @@ class LibraryActivity : ComponentActivity() {
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         .putExtra(Intent.EXTRA_RETURN_RESULT, true),
                 )
+            }
+        }
+    }
+
+    /** Saves the Vibepollo address and token, lists its apps, then rescans. */
+    private fun connectMoonlight(overlay: Overlay.Moonlight) {
+        moonlight.save(overlay.address.text.toString(), overlay.token.text.toString())
+        showMessage("Moonlight", "Contacting Vibepollo…")
+        work?.cancel()
+        work = lifecycleScope.launch {
+            try {
+                val apps = withContext(Dispatchers.IO) { moonlight.apps() }
+                showMessage("Moonlight", "${apps.size} apps on ${moonlight.address}.")
+                rescan()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w("MielMoonlight", "Listing apps failed", error)
+                showMessage("Moonlight", "Vibepollo could not be reached. ${error.message}")
             }
         }
     }
@@ -1101,21 +1147,18 @@ class LibraryActivity : ComponentActivity() {
         sounds.play(Cue.CONFIRM)
     }
 
-    private fun openDroidDeck(game: Game) {
-        val intent =
-            Intent(Intent.ACTION_VIEW, Uri.parse(game.romUri))
-                .setClassName(DroidDeck.PACKAGE, "${DroidDeck.PACKAGE}.MainActivity")
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    /** Starts `intent` of the app named `name` on the upper display. */
+    private fun openExternal(intent: Intent, name: String) {
         try {
             startActivity(
-                intent,
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY).toBundle(),
             )
         } catch (error: android.content.ActivityNotFoundException) {
-            return fail("Install DroidDeck to play this game.")
+            return fail("Install $name to play this game.")
         } catch (error: RuntimeException) {
-            Log.w(Displays.TAG, "Opening DroidDeck failed", error)
-            return fail("Android could not open DroidDeck.")
+            Log.w(Displays.TAG, "Opening $name failed", error)
+            return fail("Android could not open $name.")
         }
         session.recordLaunch()
         sounds.play(Cue.CONFIRM)

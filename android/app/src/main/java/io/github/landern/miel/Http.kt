@@ -2,6 +2,7 @@ package io.github.landern.miel
 
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.io.InterruptedIOException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
@@ -56,19 +57,22 @@ private fun readBytes(url: String, limit: Int, timeoutMillis: Int): ByteArray {
         if (connection.responseCode != 200) {
             throw IOException("HTTP " + connection.responseCode)
         }
-        connection.inputStream.use { input ->
-            val output = ByteArrayOutputStream()
-            val buffer = ByteArray(8192)
-            while (true) {
-                val count = input.read(buffer)
-                if (count == -1) break
-                if (Thread.currentThread().isInterrupted) throw InterruptedIOException()
-                if (output.size() + count > limit) throw IOException("Response too large")
-                output.write(buffer, 0, count)
-            }
-            return output.toByteArray()
-        }
+        return connection.inputStream.use { readLimited(it, limit) }
     } finally {
         connection.disconnect()
     }
+}
+
+/** All of `input`, failing beyond `limit` bytes or when the thread is interrupted. */
+internal fun readLimited(input: InputStream, limit: Int): ByteArray {
+    val output = ByteArrayOutputStream()
+    val buffer = ByteArray(8192)
+    while (true) {
+        val count = input.read(buffer)
+        if (count == -1) break
+        if (Thread.currentThread().isInterrupted) throw InterruptedIOException()
+        if (output.size() + count > limit) throw IOException("Response too large")
+        output.write(buffer, 0, count)
+    }
+    return output.toByteArray()
 }

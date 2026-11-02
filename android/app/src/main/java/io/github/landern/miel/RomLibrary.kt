@@ -67,9 +67,18 @@ data class Game(
     val deletable: Boolean
         get() = core != null && (romUri.startsWith("content://") || downloaded)
 
+    /**
+     * Launched through another app: a DroidDeck export or a Vibepollo app streamed by Moonlight.
+     */
+    val external: Boolean
+        get() = DroidDeck.isGame(this) || Moonlight.isGame(this)
+
+    /** The Steam app ID of a DroidDeck export or a Vibepollo app, or an empty string. */
+    val steamId: String
+        get() = DroidDeck.steamId(this).ifEmpty { Moonlight.steamId(this) }
+
     val playable: Boolean
-        get() =
-            DroidDeck.isGame(this) || (romUri.isNotEmpty() && core?.accepts(romFilename) == true)
+        get() = external || (romUri.isNotEmpty() && core?.accepts(romFilename) == true)
 }
 
 /**
@@ -86,6 +95,7 @@ class RomLibrary(
     private val scanning = AtomicBoolean()
     private val saved = AtomicFile(File(context.filesDir, "rom-library.json"))
     private val romm = RomM(context)
+    private val moonlight = Moonlight(context)
     private val notifications = MielNotifications.Channel()
 
     /** The current library. */
@@ -148,6 +158,7 @@ class RomLibrary(
             try {
                 val scan = if (tree != null) scanFolder(tree) else Scan(null)
                 if (romm.paired) merge(scan)
+                if (moonlight.configured) stream(scan)
                 scan.found.replaceAll { game -> scan.metadata[game.id]?.apply(game) ?: game }
                 scan.found.sortBy { it.title.lowercase() }
                 if (closed) return@execute
@@ -155,10 +166,18 @@ class RomLibrary(
                 publish(games)
             } catch (error: Exception) {
                 val ticket = notifications.begin()
-                if (!closed) notifications.update(ticket, MielNotification(
-                    "Library update failed", "Your previous library was kept",
-                    "Finished", 1f, finished = true, warning = true,
-                ))
+                if (!closed)
+                    notifications.update(
+                        ticket,
+                        MielNotification(
+                            "Library update failed",
+                            "Your previous library was kept",
+                            "Finished",
+                            1f,
+                            finished = true,
+                            warning = true,
+                        ),
+                    )
                 report =
                     "Scan failed. Your previous library was kept. Re-select the folder" +
                         " if access changed.\n\n" +
@@ -238,6 +257,22 @@ class RomLibrary(
         var entries = 0
         var skipped = 0
         var romm = ""
+        var moonlight = ""
+    }
+
+    /** Adds the Vibepollo host's apps, or its apps from the last scan when it is unreachable. */
+    private fun stream(scan: Scan) {
+        val apps =
+            try {
+                moonlight.apps().also { scan.moonlight = "Moonlight: ${it.size} apps." }
+            } catch (error: Exception) {
+                if (error !is IOException && error !is JSONException) throw error
+                Log.w("MielLibrary", "Vibepollo unreachable", error)
+                scan.moonlight =
+                    "Moonlight update failed: ${error.message.orEmpty()}. Kept saved apps."
+                games.filter(Moonlight::isGame)
+            }
+        scan.found.addAll(apps)
     }
 
     /**
@@ -252,27 +287,48 @@ class RomLibrary(
         show(MielNotification("Fetching game metadata", "RomM · Connecting"))
         val remote =
             try {
-                romm.roms { title, completed, total ->
-                    show(MielNotification(
-                        title.ifEmpty { "Fetching game metadata" }, "Metadata · RomM",
-                        "$completed of $total", if (total > 0) completed.toFloat() / total else -1f,
-                    ))
-                }.mapNotNull { rom ->
-                    val platform = RomNames.platform(rom.filename, rom.folder)
-                    if (Core.of(platform) == null) null else romGame(romm.server, rom, platform)
-                }
+                romm
+                    .roms { title, completed, total ->
+                        show(
+                            MielNotification(
+                                title.ifEmpty { "Fetching game metadata" },
+                                "Metadata · RomM",
+                                "$completed of $total",
+                                if (total > 0) completed.toFloat() / total else -1f,
+                            ),
+                        )
+                    }
+                    .mapNotNull { rom ->
+                        val platform = RomNames.platform(rom.filename, rom.folder)
+                        if (Core.of(platform) == null) null else romGame(romm.server, rom, platform)
+                    }
             } catch (error: IOException) {
                 Log.w("MielLibrary", "RomM unreachable", error)
-                show(MielNotification("Metadata update failed", "RomM unavailable · Kept saved metadata",
-                    "Finished", 1f, finished = true, warning = true))
+                show(
+                    MielNotification(
+                        "Metadata update failed",
+                        "RomM unavailable · Kept saved metadata",
+                        "Finished",
+                        1f,
+                        finished = true,
+                        warning = true,
+                    ),
+                )
                 scan.romm = "RomM update failed: ${error.message.orEmpty()}. Kept saved metadata."
                 val links = games.filter { it.rommId != 0 }.associateBy { it.id }
                 scan.found.replaceAll { game -> links[game.id]?.let(game::linked) ?: game }
                 scan.found.addAll(games.filter { it.romUri.startsWith(RomM.URI) })
                 return
             }
-        show(MielNotification("Metadata updated", "${remote.size} games refreshed",
-            "${remote.size} of ${remote.size}", 1f, finished = true))
+        show(
+            MielNotification(
+                "Metadata updated",
+                "${remote.size} games refreshed",
+                "${remote.size} of ${remote.size}",
+                1f,
+                finished = true,
+            ),
+        )
         val local =
             scan.found.withIndex().associate { (i, game) ->
                 (game.platform to game.romFilename) to i
@@ -329,6 +385,7 @@ class RomLibrary(
         val completed =
             status +
                 (if (scan.romm.isEmpty()) "" else "\n\n" + scan.romm) +
+                (if (scan.moonlight.isEmpty()) "" else "\n\n" + scan.moonlight) +
                 "\n\nSupported cartridge files are detected by extension. ISO/RVZ/CHD/PBP/EXE/BIN/CUE/M3U" +
                 " and ZIP need a recognized platform folder. Other archives, CIA installers," +
                 " referenced disc tracks, hidden and empty files are skipped. Detection does not validate" +

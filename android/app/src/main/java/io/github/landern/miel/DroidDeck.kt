@@ -49,6 +49,12 @@ object DroidDeck {
             game.romUri.startsWith(PREFIX) &&
             validId(game.romUri.removePrefix(PREFIX))
 
+    fun steamId(game: Game): String =
+        game.romUri
+            .removePrefix(PREFIX)
+            .takeIf { isGame(game) && it.toUIntOrNull() != null }
+            .orEmpty()
+
     fun artwork(game: Game, icon: String): Game {
         if (!isGame(game)) return game
         val id = game.romUri.removePrefix(PREFIX)

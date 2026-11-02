@@ -20,9 +20,9 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Covers and screenshots from local sidecars, Steam, RomM and Libretro's thumbnail server,
- * kept in files/artwork/libretro-v1. Cached images are published before any request; downloads run
- * one at a time on a background thread, covers first.
+ * Covers and screenshots from local sidecars, Steam, RomM and Libretro's thumbnail server, kept in
+ * files/artwork/libretro-v1. Cached images are published before any request; downloads run one at a
+ * time on a background thread, covers first.
  */
 class ArtworkCache(
     private val context: Context,
@@ -112,10 +112,18 @@ class ArtworkCache(
                 download(directory, games, request, ticket)
             } catch (error: Exception) {
                 Log.w(TAG, "Artwork cache unavailable", error)
-                if (current(request)) notifications.update(ticket, MielNotification(
-                    "Artwork update failed", "Please try rescanning your library",
-                    "Finished", 1f, finished = true, warning = true,
-                ))
+                if (current(request))
+                    notifications.update(
+                        ticket,
+                        MielNotification(
+                            "Artwork update failed",
+                            "Please try rescanning your library",
+                            "Finished",
+                            1f,
+                            finished = true,
+                            warning = true,
+                        ),
+                    )
             }
         }
     }
@@ -130,7 +138,7 @@ class ArtworkCache(
     ): Boolean {
         val recorded = File(directory, stem(game.id, kind) + ".source.txt")
         if (
-            !source.startsWith("content:") &&
+            !local(source) &&
                 paths.containsKey("$kind:${game.id}") &&
                 recorded.isFile &&
                 recorded.readText() == source
@@ -139,7 +147,7 @@ class ArtworkCache(
         }
         return try {
             val bytes =
-                if (source.startsWith("content:")) {
+                if (local(source)) {
                     context.contentResolver.openInputStream(Uri.parse(source))?.use {
                         readImage(it)
                     } ?: throw IOException("Cannot open local artwork")
@@ -155,6 +163,9 @@ class ArtworkCache(
             false
         }
     }
+
+    /** A local file or document, reread on every update. */
+    private fun local(source: String) = source.startsWith("content:") || source.startsWith("file:")
 
     private fun notifyChanged() {
         main.post { if (!closed) changed() }
@@ -183,21 +194,25 @@ class ArtworkCache(
         val listings = HashMap<String, List<String>>()
         val tried = HashSet<String>()
         // Freeze the pending asset list: cached images and recorded misses do not inflate progress.
-        val pending = KINDS.flatMap { kind -> games.map { it to kind } }.filter { (game, kind) ->
-            if (!current(request)) return
-            val source = sourceFor(game, kind)
-            if (source.startsWith("content:")) {
-                fetchSource(directory, game, kind, source, request)
-                false
-            } else if (hasMiss(directory, game, kind, source)) {
-                false
-            } else if (source.isNotEmpty()) {
-                val recorded = File(directory, stem(game.id, kind) + ".source.txt")
-                !(paths.containsKey("$kind:${game.id}") && recorded.isFile && recorded.readText() == source)
-            } else {
-                !paths.containsKey("$kind:${game.id}") && game.system.isNotEmpty()
-            }
-        }
+        val pending =
+            KINDS.flatMap { kind -> games.map { it to kind } }
+                .filter { (game, kind) ->
+                    if (!current(request)) return
+                    val source = sourceFor(game, kind)
+                    if (source.startsWith("content:")) {
+                        fetchSource(directory, game, kind, source, request)
+                        false
+                    } else if (hasMiss(directory, game, kind, source)) {
+                        false
+                    } else if (source.isNotEmpty()) {
+                        val recorded = File(directory, stem(game.id, kind) + ".source.txt")
+                        !(paths.containsKey("$kind:${game.id}") &&
+                            recorded.isFile &&
+                            recorded.readText() == source)
+                    } else {
+                        !paths.containsKey("$kind:${game.id}") && game.system.isNotEmpty()
+                    }
+                }
         if (pending.isEmpty() || !current(request)) return
         fun show(value: MielNotification) {
             if (current(request)) notifications.update(ticket, value)
@@ -207,36 +222,44 @@ class ArtworkCache(
         pending.forEachIndexed { index, (game, kind) ->
             if (!current(request)) return
             val supplied = sourceFor(game, kind)
-            val asset = when (kind) {
-                LibretroArt.BOXARTS -> "Cover art"
-                else -> "Screenshot"
-            }
-            val provider = if (supplied.isEmpty()) "Libretro" else "Library source"
-            show(MielNotification("Downloading: ${game.title}", "$asset · $provider",
-                "${index + 1} of ${pending.size}", index.toFloat() / pending.size))
-            val success = try {
-                if (supplied.isNotEmpty()) {
-                    fetchSource(directory, game, kind, supplied, request)
-                } else {
-                    val key = "$kind:${game.system}"
-                    if (tried.add(key)) listings[key] = listing(directory, game.system, kind)
-                    val name = match(listings[key], game)
-                    if (name == null) {
-                        false
-                    } else {
-                        val source = LibretroArt.imageUrl(game.system, kind, name)
-                        val file = fetchImage(directory, game.id, kind, game.system, source)
-                        if (current(request)) {
-                            paths["$kind:${game.id}"] = file.absolutePath
-                            notifyChanged()
-                        }
-                        true
-                    }
+            val asset =
+                when (kind) {
+                    LibretroArt.BOXARTS -> "Cover art"
+                    else -> "Screenshot"
                 }
-            } catch (error: IOException) {
-                Log.w(TAG, "No artwork for ${game.id}", error)
-                false
-            }
+            val provider = if (supplied.isEmpty()) "Libretro" else "Library source"
+            show(
+                MielNotification(
+                    "Downloading: ${game.title}",
+                    "$asset · $provider",
+                    "${index + 1} of ${pending.size}",
+                    index.toFloat() / pending.size,
+                ),
+            )
+            val success =
+                try {
+                    if (supplied.isNotEmpty()) {
+                        fetchSource(directory, game, kind, supplied, request)
+                    } else {
+                        val key = "$kind:${game.system}"
+                        if (tried.add(key)) listings[key] = listing(directory, game.system, kind)
+                        val name = match(listings[key], game)
+                        if (name == null) {
+                            false
+                        } else {
+                            val source = LibretroArt.imageUrl(game.system, kind, name)
+                            val file = fetchImage(directory, game.id, kind, game.system, source)
+                            if (current(request)) {
+                                paths["$kind:${game.id}"] = file.absolutePath
+                                notifyChanged()
+                            }
+                            true
+                        }
+                    }
+                } catch (error: IOException) {
+                    Log.w(TAG, "No artwork for ${game.id}", error)
+                    false
+                }
             if (success) {
                 downloaded++
                 Files.deleteIfExists(File(directory, stem(game.id, kind) + ".miss").toPath())
@@ -245,12 +268,18 @@ class ArtworkCache(
             }
         }
         val missing = pending.size - downloaded
-        show(MielNotification(
-            if (missing == 0) "Library updated" else "Update finished",
-            if (missing == 0) "$downloaded downloads complete" else "$downloaded downloaded · $missing unavailable",
-            "${pending.size} of ${pending.size}", 1f, finished = true, warning = missing > 0,
-            unavailableFraction = missing.toFloat() / pending.size,
-        ))
+        show(
+            MielNotification(
+                if (missing == 0) "Library updated" else "Update finished",
+                if (missing == 0) "$downloaded downloads complete"
+                else "$downloaded downloaded · $missing unavailable",
+                "${pending.size} of ${pending.size}",
+                1f,
+                finished = true,
+                warning = missing > 0,
+                unavailableFraction = missing.toFloat() / pending.size,
+            ),
+        )
     }
 
     private fun hasMiss(directory: File, game: Game, kind: String, source: String): Boolean {
