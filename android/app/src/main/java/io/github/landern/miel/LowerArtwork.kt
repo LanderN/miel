@@ -2,8 +2,11 @@ package io.github.landern.miel
 
 import android.app.Activity
 import android.app.Presentation
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.util.Log
 import android.view.Display
+import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
 
@@ -14,6 +17,7 @@ import android.widget.FrameLayout
 class LowerArtwork(private val activity: Activity) {
     private var lower: Presentation? = null
     private var view: HeroView? = null
+    private var host: FrameLayout? = null
     private var yielded = false
     private var dimmed = false
     private var hero = Hero("", "", "")
@@ -39,10 +43,12 @@ class LowerArtwork(private val activity: Activity) {
             host.addView(NotificationView(presentation.context), FrameLayout.LayoutParams(-1, -1))
             presentation.setContentView(host)
             presentation.window?.let(Displays::immersive)
+            presentation.window?.setBackgroundDrawable(ColorDrawable(Color.BLACK))
             hero.update(this.hero)
             lower = presentation
             view = hero
-            applyBrightness()
+            this.host = host
+            applyDim()
             presentation.show()
         } catch (error: RuntimeException) {
             Log.e(Displays.TAG, "Lower artwork failed", error)
@@ -63,20 +69,17 @@ class LowerArtwork(private val activity: Activity) {
         close()
     }
 
-    /** Uses minimum brightness while another app covers the upper library. */
+    /**
+     * Shows black while another app covers the upper library. Display brightness is left alone, so
+     * a keyboard on the lower display stays readable.
+     */
     fun dim(dim: Boolean) {
         dimmed = dim && !yielded
-        applyBrightness()
+        applyDim()
     }
 
-    private fun applyBrightness() {
-        val window = lower?.window ?: return
-        window.attributes =
-            window.attributes.apply {
-                screenBrightness =
-                    if (dimmed) WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_OFF
-                    else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-            }
+    private fun applyDim() {
+        host?.visibility = if (dimmed) View.INVISIBLE else View.VISIBLE
     }
 
     fun reclaim() {
@@ -87,5 +90,6 @@ class LowerArtwork(private val activity: Activity) {
         lower?.dismiss()
         lower = null
         view = null
+        host = null
     }
 }
