@@ -32,6 +32,8 @@ data class Hero(
     val settings: SettingsDetail? = null,
     /** Play time and last played, below `detail`; see PlayTime.describe. */
     val played: String = "",
+    /** HowLongToBeat times, between `detail` and `played`; see HowLongToBeat.describe. */
+    val times: String = "",
 )
 
 /**
@@ -385,6 +387,10 @@ class HeroView(context: Context) : View(context) {
         }
         paint.color = 0xffd9d4c8.toInt()
         paint.alpha = opacity
+        if (hero.times.isNotEmpty()) {
+            canvas.drawText(hero.times, x, detailY, paint)
+            detailY -= paint.fontSpacing
+        }
         val detail =
             TextUtils.ellipsize(hero.detail, paint, width - 2 * x, TextUtils.TruncateAt.END)
                 .toString()

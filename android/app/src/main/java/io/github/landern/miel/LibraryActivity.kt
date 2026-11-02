@@ -72,6 +72,12 @@ class LibraryActivity : ComponentActivity() {
 
     /** Bumped whenever new artwork is cached. */
     private var artworkVersion by mutableIntStateOf(0)
+
+    /** Bumped whenever HowLongToBeat times are cached. */
+    private var timesVersion by mutableIntStateOf(0)
+
+    /** Games whose HowLongToBeat search failed while the library is open. */
+    private val timesFailed = HashSet<String>()
     private val images = LruCache<String, ImageBitmap>(32)
     private var keyDirection: Command? = null
     private var axisDirection: Command? = null
@@ -164,6 +170,8 @@ class LibraryActivity : ComponentActivity() {
             Library(session, overlay, art, ::command)
             val hero = hero()
             SideEffect { lowerArtwork.update(hero) }
+            val selected = session.game.takeIf { session.tab != Tab.APPS }
+            LaunchedEffect(selected?.id) { selected?.let { lookupTimes(it) } }
             LaunchedEffect(typing) { if (!typing) keyFocus.requestFocus() }
         }
         // Leaving touch mode consumes the first navigation key unless a plain View holds focus.
@@ -243,11 +251,14 @@ class LibraryActivity : ComponentActivity() {
                     listOf(game.platform, if (game.year > 0) "${game.year}" else "", game.genre)
                         .filter { it.isNotEmpty() }
                         .joinToString(" · ")
+                timesVersion
                 Hero(
                     game.title,
                     detail,
                     frame?.path ?: artwork.heroPath(game),
                     played = PlayTime.describe(this, game.id),
+                    times =
+                        HowLongToBeat.cached(this, game)?.let(HowLongToBeat::describe).orEmpty(),
                 )
             } ?: Hero(if (session.games.isEmpty()) "No games" else "No recent games", "", "")
         }
@@ -628,6 +639,9 @@ class LibraryActivity : ComponentActivity() {
                     images.evictAll()
                     if (removed) {
                         DroidDeck.clearMetadata(this)
+                        HowLongToBeat.clear(this)
+                        timesFailed.clear()
+                        timesVersion++
                         this.overlay = null
                         rescan()
                     } else
@@ -1145,6 +1159,19 @@ class LibraryActivity : ComponentActivity() {
         }
         session.rememberScreen(screen)
         sounds.play(Cue.CONFIRM)
+    }
+
+    /** Searches HowLongToBeat for `game` once it stays selected, unless it was looked up. */
+    private suspend fun lookupTimes(game: Game) {
+        if (game.id in timesFailed || HowLongToBeat.cached(this, game) != null) return
+        delay(600)
+        try {
+            withContext(Dispatchers.IO) { HowLongToBeat.lookup(applicationContext, game) }
+        } catch (error: IOException) {
+            Log.w("MielLibrary", "HowLongToBeat lookup failed for ${game.title}", error)
+            timesFailed.add(game.id)
+        }
+        timesVersion++
     }
 
     /** Starts `intent` of the app named `name` on the upper display. */
