@@ -69,6 +69,8 @@ sealed interface Command {
 
     object Y : Command
 
+    object ChooseEmulator : Command
+
     object GameCodes : Command
 
     object DeleteRom : Command
@@ -185,7 +187,10 @@ data class Disk(
  * The library's state: its games and apps, the selection, the More dialog and each game's saved
  * settings and launch order. Opens the session file at `path`, falling back to its backup.
  */
-class Session(private val path: File) {
+class Session(
+    private val path: File,
+    private val emulator: (Game) -> Emulator = { Emulator.BUILT_IN },
+) {
     var games by mutableStateOf(emptyList<Game>())
         private set
 
@@ -218,14 +223,18 @@ class Session(private val path: File) {
     /** The selected row of [moreActions]. */
     var moreRow by mutableStateOf(0)
 
+    val selectedEmulator: Emulator?
+        get() = game?.let(emulator)
+
     /** More's actions, top to bottom; A runs the selected one. */
     val moreActions: List<Command>
         get() = buildList {
             val game = game ?: return@buildList
             add(Command.Favorite)
+            if (Emulator.choices(game).size > 1) add(Command.ChooseEmulator)
             if (game.core != null) add(Command.Y)
             if (game.core == Core.DOLPHIN) add(Command.GameCodes)
-            add(Command.A)
+            if (emulator(game) == Emulator.BUILT_IN) add(Command.A)
             if (game.deletable) add(Command.DeleteRom)
         }
 
@@ -439,7 +448,7 @@ class Session(private val path: File) {
             inMore && (command == Command.Up || command == Command.Down) ->
                 moreRow =
                     (moreRow + if (command == Command.Up) -1 else 1).coerceIn(moreActions.indices)
-            inMore && command == Command.A -> confirm = true
+            inMore && command == Command.A && Command.A in moreActions -> confirm = true
             menu && command == Command.B -> closeMenu()
             command == Command.Suspend -> {
                 checkpoint()

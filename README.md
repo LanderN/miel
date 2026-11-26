@@ -116,12 +116,23 @@ to the game. Auto save stays separate from the manual slots.
 PSP games run on the upper screen with 2× rendering resolution by default and left-stick controls.
 Keep ISO, CSO, PBP, CHD, ELF or PRX files in a `PSP` or `PlayStation Portable` folder;
 ZIP archives containing a game also work. PPSSPP's runtime assets are bundled; no BIOS is needed.
-In-game saves live under `/sdcard/miel/saves/PPSSPP/<game>/PSP/SAVEDATA/`.
+In-game saves live under `/sdcard/miel/saves/PSP/<game>/PSP/SAVEDATA/`.
 Home and Back save a checkpoint for automatic resume. RomM syncs each game’s in-game saves
 as a ZIP containing its `PSP/SAVEDATA` folder.
 
 GameCube games run through Dolphin. Keep ISO, GCM, RVZ, GCZ, WIA, CISO, DOL or ELF files in a
 `GameCube` folder. Emulator settings include resolution, aspect ratio and widescreen options.
+
+In-game saves are grouped by platform under `/sdcard/miel/saves/`. Save states
+are kept separately under `/sdcard/miel/states/`.
+
+For Game Boy, Game Boy Color, Game Boy Advance and Nintendo DS games, open
+**More → Emulator** to see or change the emulator for that game. **Start fresh**
+is available when the built-in core is selected. After the first launch from miel, open
+the game's imported entry in PokeDaisy and use **Save Folder** to select its
+platform folder under `/sdcard/miel/saves/`.
+PokeDaisy stores the folder choice per ROM path. For a RomM game, miel syncs the
+shared save when you launch it.
 
 ## PC games with DroidDeck
 

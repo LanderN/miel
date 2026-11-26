@@ -165,6 +165,8 @@ sealed interface Overlay {
         val perGame: Boolean = false,
     ) : Overlay
 
+    data class ChooseEmulator(val game: Game, val current: Emulator, val selected: Int) : Overlay
+
     data class SaveAccess(val game: Game) : Overlay
 
     data class DeleteRom(val game: Game) : Overlay
@@ -221,7 +223,15 @@ class Art(val cover: (Game) -> Cover?, val icon: (InstalledApp) -> ImageBitmap?)
  * row. Every input goes to `command`; see Command.
  */
 @Composable
-fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) -> Unit) {
+fun Library(
+    session: Session,
+    overlay: Overlay?,
+    art: Art,
+    command: (Command) -> Unit,
+) {
+    val emulator = session.selectedEmulator
+    val emulatorLabel =
+        session.game?.takeIf { Emulator.choices(it).size > 1 }?.let { emulator?.label(it) }
     val apps = session.tab == Tab.APPS
     val total = if (apps) session.apps.size else session.order.size
     val position = if (apps) session.appSelected else session.position
@@ -278,8 +288,12 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
                             total == 0 && session.games.isNotEmpty() -> "Browse games"
                             total == 0 -> "Choose ROM folder"
                             session.game?.external == true -> "Play"
-                            session.launched -> "Continue"
-                            else -> "Play"
+                            else -> {
+                                val action =
+                                    if (session.launched && emulator != Emulator.POKEDAISY) "Continue"
+                                    else "Play"
+                                if (emulatorLabel == null) action else "$action in $emulatorLabel"
+                            }
                         },
                         minWidth = if (apps) 120.dp else 180.dp,
                     ) {
@@ -291,8 +305,21 @@ fun Library(session: Session, overlay: Overlay?, art: Art, command: (Command) ->
                 Text(session.error, color = Color(0xFFBC5062), size = 12.sp)
             }
         }
-        if (session.menu && overlay == null) More(session, command)
+        if (session.menu && overlay == null) More(session, emulatorLabel, command)
         when (overlay) {
+            is Overlay.ChooseEmulator ->
+                Dialog("Choose emulator", "") {
+                    Emulator.choices(overlay.game).forEachIndexed { index, emulator ->
+                        MoreRow(
+                            emulator.label(overlay.game) +
+                                if (emulator == overlay.current) " (current)" else "",
+                            overlay.selected == index,
+                            false,
+                            R.drawable.miel_action_settings,
+                        ) { command(Command.Pick(index)) }
+                    }
+                    Row { Pill("B", "Back", primary = false) { command(Command.B) } }
+                }
             is Overlay.Settings -> Settings(overlay, session, command)
             is Overlay.Codes -> GameCodesScreen(overlay.editor, command)
             is Overlay.Message -> Message(overlay, command)
@@ -976,9 +1003,11 @@ internal fun MoreRow(
 }
 
 @Composable
-private fun More(session: Session, command: (Command) -> Unit) {
+private fun More(session: Session, emulatorLabel: String?, command: (Command) -> Unit) {
     val confirm = session.confirm
     val game = session.game
+    val builtIn = game?.takeIf { Emulator.choices(it).size > 1 }?.core?.displayName
+    val freshLabel = builtIn?.let { "Start fresh in $it" } ?: "Start fresh"
     val detail =
         listOf(
                 game?.platform.orEmpty(),
@@ -987,7 +1016,10 @@ private fun More(session: Session, command: (Command) -> Unit) {
             )
             .filter { it.isNotEmpty() }
             .joinToString(" · ")
-    Dialog(if (confirm) "Begin again?" else game?.title.orEmpty(), if (confirm) "" else detail) {
+    Dialog(
+        if (confirm) "Begin again?" else game?.title.orEmpty(),
+        if (confirm) builtIn.orEmpty() else detail,
+    ) {
         if (confirm) {
             Text(
                 "Replaces this session. In-game saves are kept.",
@@ -1008,16 +1040,18 @@ private fun More(session: Session, command: (Command) -> Unit) {
                             Command.Favorite ->
                                 if (session.favorite) "Remove from Favorites"
                                 else "Add to Favorites"
+                            Command.ChooseEmulator -> "Emulator · ${emulatorLabel.orEmpty()}"
                             Command.Y -> "Emulator settings"
                             Command.GameCodes -> "Game codes"
                             Command.DeleteRom ->
                                 if (game?.remote == true) "Remove download" else "Delete ROM"
-                            else -> "Start fresh"
+                            else -> freshLabel
                         }
                     val icon =
                         when (action) {
                             Command.Favorite -> R.drawable.miel_action_star
                             Command.Y,
+                            Command.ChooseEmulator,
                             Command.GameCodes -> R.drawable.miel_action_settings
                             Command.DeleteRom -> R.drawable.miel_action_close
                             else -> R.drawable.miel_action_reload

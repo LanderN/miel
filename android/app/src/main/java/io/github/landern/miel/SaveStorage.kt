@@ -22,19 +22,23 @@ object SaveStorage {
     }
 
     /**
-     * The in-game save the host keeps for `core`'s game in `filename`, named after the file without
+     * The in-game save for a game on `platform`, named after its file without
      * its extension, with its folder created.
      */
-    fun save(core: Core, filename: String): File =
-        folder("saves/${core.coreName}").resolve(filename.substringBeforeLast('.') + ".srm")
+    fun save(platform: String, filename: String): File {
+        val extension = if (Emulator.sharesPokeDaisySaves(platform)) ".sav" else ".srm"
+        return platformFolder(platform).resolve(filename.substringBeforeLast('.') + extension)
+    }
+
+    fun platformFolder(platform: String): File = folder("saves/$platform")
 
     /** A game's PSP memory stick, containing PSP/SAVEDATA. */
     fun memoryStick(filename: String): File =
-        folder("saves/PPSSPP/${filename.substringBeforeLast('.')}")
+        folder("saves/PSP/${filename.substringBeforeLast('.')}")
 
     /** A game's Dolphin user data, including its GameCube memory cards. */
     fun gameCube(filename: String): File =
-        folder("saves/Dolphin/${filename.substringBeforeLast('.')}")
+        folder("saves/GameCube/${filename.substringBeforeLast('.')}")
 
     /** Where a game downloaded from RomM for `platform` is kept, with its folder created. */
     fun download(platform: String, filename: String): File =
@@ -49,7 +53,7 @@ object SaveStorage {
 
     /** Removes only Azahar's compiled and transferable shader caches. */
     fun clearAzaharShaderCache(root: File = root()): Boolean {
-        val shaders = File(root, "saves/Azahar/shaders")
+        val shaders = File(root, "saves/Nintendo 3DS/Azahar/shaders")
         return !shaders.exists() || shaders.deleteRecursively()
     }
 

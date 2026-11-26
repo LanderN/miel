@@ -503,7 +503,8 @@ class CoreActivity : ComponentActivity() {
                         )
                 }
                 statePath = File(states, rom.sha256 + ".state").absolutePath
-                savePath = SaveStorage.save(core, filename).absolutePath
+                val platform = intent.getStringExtra(EXTRA_PLATFORM).orEmpty()
+                savePath = SaveStorage.save(platform, filename).absolutePath
                 main.post {
                     if (!destroyed) start(nativeLibrary(core.library), rom.file.absolutePath, root)
                 }
@@ -585,7 +586,9 @@ class CoreActivity : ComponentActivity() {
                     .absolutePath
             else if (!diagnostic && core == Core.DOLPHIN)
                 SaveStorage.gameCube(intent.getStringExtra(EXTRA_FILENAME).orEmpty()).absolutePath
-            else File(root, "saves").absolutePath,
+            else if (diagnostic) File(root, "saves").absolutePath
+            else SaveStorage.platformFolder(intent.getStringExtra(EXTRA_PLATFORM).orEmpty())
+                .absolutePath,
             statePath,
             savePath,
             if (diagnostic) TEST_CORE_NAME else core.coreName,

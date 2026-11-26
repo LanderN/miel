@@ -119,6 +119,12 @@ class LibraryActivity : ComponentActivity() {
 
     /** The sync SaveConflict waits for. */
     private var conflict: Sync? = null
+    private val emulators by lazy { getSharedPreferences("emulators", MODE_PRIVATE) }
+
+    private fun emulator(game: Game): Emulator =
+        Emulator.entries.firstOrNull {
+            it.name == emulators.getString("choice:${game.id}", null) && it.supports(game)
+        } ?: Emulator.BUILT_IN
 
     private val folderPicker =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -141,7 +147,7 @@ class LibraryActivity : ComponentActivity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
-        session = Session(File(filesDir, "sessions-v1.json"))
+        session = Session(File(filesDir, "sessions-v1.json"), ::emulator)
         sounds = UiSounds(this)
         artwork = ArtworkCache(applicationContext) { artworkVersion++ }
         library =
@@ -331,6 +337,13 @@ class LibraryActivity : ComponentActivity() {
                 }
             return
         }
+        if (command == Command.ChooseEmulator && session.menu && !session.confirm) {
+            val game = session.game ?: return
+            val current = emulator(game)
+            overlay = Overlay.ChooseEmulator(game, current, Emulator.choices(game).indexOf(current))
+            sounds.play(Cue.OPEN)
+            return
+        }
         if (command == Command.GameCodes && session.menu && !session.confirm) {
             session.game
                 ?.takeIf { it.core == Core.DOLPHIN }
@@ -352,14 +365,18 @@ class LibraryActivity : ComponentActivity() {
         if (command == Command.A && session.tab != Tab.APPS) {
             val game = session.game ?: return
             if (!game.playable) return fail(UNPLAYABLE)
-            if (DroidDeck.isGame(game))
-                return openExternal(
+            if (DroidDeck.isGame(game)) {
+                openExternal(
                     Intent(Intent.ACTION_VIEW, Uri.parse(game.romUri))
                         .setClassName(DroidDeck.PACKAGE, "${DroidDeck.PACKAGE}.MainActivity"),
                     "DroidDeck",
                 )
-            if (Moonlight.isGame(game))
-                return openExternal(Moonlight.launch(game, packageManager), "Moonlight")
+                return
+            }
+            if (Moonlight.isGame(game)) {
+                openExternal(Moonlight.launch(game, packageManager), "Moonlight")
+                return
+            }
             if (!session.menu || session.confirm) return syncAndStart(game)
         }
         if (
@@ -419,6 +436,27 @@ class LibraryActivity : ComponentActivity() {
 
     private fun overlayCommand(overlay: Overlay, command: Command) {
         when (overlay) {
+            is Overlay.ChooseEmulator -> {
+                val choices = Emulator.choices(overlay.game)
+                val selected = when (command) {
+                    Command.A -> overlay.selected
+                    is Command.Pick -> command.index
+                    Command.Up, Command.Down -> {
+                        val step = if (command == Command.Up) -1 else 1
+                        this.overlay = overlay.copy(
+                            selected = Math.floorMod(overlay.selected + step, choices.size),
+                        )
+                        sounds.play(Cue.NAVIGATE)
+                        return
+                    }
+                    Command.B -> return close()
+                    else -> return
+                }
+                emulators.edit()
+                    .putString("choice:${overlay.game.id}", choices[selected].name)
+                    .apply()
+                close()
+            }
             is Overlay.Codes -> overlay.editor.command(command, ::close)
             is Overlay.Settings -> {
                 val indices = overlay.core?.settingIndices(overlay.perGame) ?: SETTINGS.indices
@@ -988,7 +1026,7 @@ class LibraryActivity : ComponentActivity() {
             PspSaves.pack(SaveStorage.memoryStick(game.romFilename), archive)
             return archive
         }
-        if (core != Core.AZAHAR) return SaveStorage.save(core, game.romFilename)
+        if (core != Core.AZAHAR) return SaveStorage.save(game.platform, game.romFilename)
         val title = titleId(game)
         if (title == 0L) return null
         val archive = File(cacheDir, "romm-saves/${game.romFilename.substringBeforeLast('.')}.zip")
@@ -1088,6 +1126,16 @@ class LibraryActivity : ComponentActivity() {
      */
     private fun start(game: Game, fresh: Boolean = session.confirm) {
         val core = game.core ?: return fail(UNPLAYABLE)
+        if (emulator(game) == Emulator.POKEDAISY && !session.confirm) {
+            if (!SaveStorage.available()) {
+                overlay = Overlay.SaveAccess(game)
+                sounds.play(Cue.OPEN)
+                return
+            }
+            return startPokeDaisy(game)
+        }
+        val externalSave = "external:${game.id}"
+        val resume = !fresh && !emulators.contains(externalSave)
         val error =
             when {
                 !File(applicationInfo.nativeLibraryDir, core.library).isFile ->
@@ -1104,7 +1152,7 @@ class LibraryActivity : ComponentActivity() {
             return
         }
         val frame = requireNotNull(artwork.frame(game))
-        if (fresh) frame.delete()
+        if (!resume) frame.delete()
         val intent =
             Intent(this, CoreActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1119,7 +1167,7 @@ class LibraryActivity : ComponentActivity() {
                 .putExtra(CoreActivity.EXTRA_GAME_ID, game.id)
                 .putExtra(CoreActivity.EXTRA_ART, artwork.heroPath(game))
                 .putExtra(CoreActivity.EXTRA_FRAME, frame.path)
-                .putExtra(CoreActivity.EXTRA_FRESH, fresh)
+                .putExtra(CoreActivity.EXTRA_FRESH, !resume)
                 .putExtra(CoreActivity.EXTRA_OPTIONS, session.launchOptions(core))
                 .putExtra(
                     CoreActivity.EXTRA_DEBUG_REPORTS,
@@ -1132,8 +1180,48 @@ class LibraryActivity : ComponentActivity() {
             intent,
             ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY).toBundle(),
         )
+        emulators.edit().remove(externalSave).apply()
         finishAndRemoveTask()
         Handler(mainLooper).postDelayed({ Process.killProcess(Process.myPid()) }, 1000)
+    }
+
+    private fun startPokeDaisy(game: Game) {
+        showMessage("Preparing game", game.title)
+        work = lifecycleScope.launch {
+            try {
+                val uri = withContext(Dispatchers.IO) {
+                    val source = if (game.romUri.startsWith(RomM.URI)) {
+                        val file = SaveStorage.download(game.platform, game.romFilename)
+                        if (!file.isFile) {
+                            RomM.download(romm.link(game.rommId, game.romFilename), romm.token, file) {}
+                        }
+                        Uri.fromFile(file)
+                    } else Uri.parse(game.romUri)
+                    val extensions = requireNotNull(game.core).extensions
+                    val rom = RomCopy.make(this@LibraryActivity, source, game.romFilename, extensions) {}
+                    androidx.core.content.FileProvider.getUriForFile(
+                        this@LibraryActivity,
+                        "$packageName.roms",
+                        rom.file,
+                        game.romFilename.substringBeforeLast('.') + "." + rom.file.extension,
+                    )
+                }
+                overlay = null
+                val intent = Intent(Intent.ACTION_VIEW, uri)
+                    .setClassName(Emulator.POKEDAISY_PACKAGE, "${Emulator.POKEDAISY_PACKAGE}.LaunchActivity")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                if (openExternal(intent, "PokeDaisy")) {
+                    emulators.edit().putBoolean("external:${game.id}", true).apply()
+                    lowerArtwork.close()
+                }
+            } catch (error: IOException) {
+                overlay = null
+                fail("Cannot open game: ${error.message}")
+            } catch (error: SecurityException) {
+                overlay = null
+                fail("miel could not read the ROM.")
+            }
+        }
     }
 
     /**
@@ -1193,20 +1281,23 @@ class LibraryActivity : ComponentActivity() {
     }
 
     /** Starts `intent` of the app named `name` on the upper display. */
-    private fun openExternal(intent: Intent, name: String) {
+    private fun openExternal(intent: Intent, name: String): Boolean {
         try {
             startActivity(
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY).toBundle(),
             )
         } catch (error: android.content.ActivityNotFoundException) {
-            return fail("Install $name to play this game.")
+            fail("Install $name to play this game.")
+            return false
         } catch (error: RuntimeException) {
             Log.w(Displays.TAG, "Opening $name failed", error)
-            return fail("Android could not open $name.")
+            fail("Android could not open $name.")
+            return false
         }
         session.recordLaunch()
         sounds.play(Cue.CONFIRM)
+        return true
     }
 
     // Input.

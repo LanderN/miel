@@ -36,7 +36,7 @@ object AzaharSaves {
 
     /** The game's save folders by archive path, which is their path in Azahar's SD folder. */
     private fun folders(titleId: Long): Map<String, File> {
-        val sd = File(SaveStorage.root(), "saves/Azahar/sdmc/Nintendo 3DS/$CONSOLE/$CONSOLE")
+        val sd = File(SaveStorage.root(), "saves/Nintendo 3DS/Azahar/sdmc/Nintendo 3DS/$CONSOLE/$CONSOLE")
         val high = "%08x".format(titleId ushr 32)
         val low = "%08x".format(titleId and 0xffffffffL)
         val extra = "%08X".format((titleId ushr 8) and 0xfffff)

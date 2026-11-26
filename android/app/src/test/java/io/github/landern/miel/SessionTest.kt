@@ -102,6 +102,20 @@ class SessionTest {
     }
 
     @Test
+    fun startFreshIsUnavailableWhenAnAlternateEmulatorIsSelected() {
+        var emulator = Emulator.POKEDAISY
+        val s = Session(file) { emulator }
+        s.replaceGames(listOf(game(0, "Game Boy Advance").copy(romFilename = "game.gba")))
+        s.run(Command.ChooseTab(Tab.GBA), Command.X, Command.A)
+        assertTrue(s.menu)
+        assertFalse(Command.A in s.moreActions)
+        assertFalse(s.confirm)
+
+        emulator = Emulator.BUILT_IN
+        assertTrue(Command.A in s.moreActions)
+    }
+
+    @Test
     fun favoritesFormATabThatPersistsAndDisappearsWhenEmpty() {
         val s = open()
         assertFalse(Tab.FAVORITES in s.tabs)
