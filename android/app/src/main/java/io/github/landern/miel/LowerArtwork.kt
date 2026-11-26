@@ -47,6 +47,7 @@ class LowerArtwork(
             val presentation = Presentation(activity, target)
             presentation.window?.addFlags(
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM or
                     WindowManager.LayoutParams.FLAG_FULLSCREEN,
             )
             val hero = HeroView(presentation.context)
