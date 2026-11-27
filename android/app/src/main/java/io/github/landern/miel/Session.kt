@@ -34,6 +34,7 @@ enum class Tab(val label: String, val platform: String? = null) {
     PSP("PSP", "PSP"),
     GAMECUBE("GC", "GameCube"),
     PC("PC", DroidDeck.PLATFORM),
+    ANDROID("Android", Game.ANDROID_PLATFORM),
     APPS("Apps"),
 }
 
@@ -110,6 +111,7 @@ data class Disk(
     val coreOptions: Map<String, Map<String, String>> = emptyMap(),
     val gameOptions: Map<String, Map<String, String>> = emptyMap(),
     val favorites: Set<String> = emptySet(),
+    val appGames: Set<String> = emptySet(),
 ) {
     fun toJson(): String =
         JSONObject()
@@ -133,6 +135,7 @@ data class Disk(
             .put("game_options", JSONObject(gameOptions.mapValues { JSONObject(it.value) }))
             .put("game_rows", gameRows)
             .put("favorites", JSONArray(favorites.sorted()))
+            .put("app_games", JSONArray(appGames.sorted()))
             .toString()
 
     companion object {
@@ -169,14 +172,17 @@ data class Disk(
                                 getJSONObject(it).entries { getString(it) }
                             },
                         gameRows = json.optInt("game_rows", 2).takeIf { it in 1..2 } ?: 2,
-                        favorites =
-                            json.optJSONArray("favorites")?.let { list ->
-                                (0 until list.length()).map(list::getString).toSet()
-                            } ?: emptySet(),
+                        favorites = json.stringSet("favorites"),
+                        appGames = json.stringSet("app_games"),
                     )
             } catch (error: Exception) {
                 null
             }
+
+        private fun JSONObject.stringSet(key: String): Set<String> =
+            optJSONArray(key)
+                ?.let { list -> (0 until list.length()).map(list::getString).toSet() }
+                .orEmpty()
 
         private fun <T> JSONObject?.entries(value: JSONObject.(String) -> T): Map<String, T> =
             this?.keys()?.asSequence()?.associateWith { value(it) }.orEmpty()
@@ -191,6 +197,8 @@ class Session(
     private val path: File,
     private val emulator: (Game) -> Emulator = { Emulator.BUILT_IN },
 ) {
+    private var romGames = emptyList<Game>()
+
     var games by mutableStateOf(emptyList<Game>())
         private set
 
@@ -222,6 +230,12 @@ class Session(
 
     /** The selected row of [moreActions]. */
     var moreRow by mutableStateOf(0)
+
+    val canShowMore: Boolean
+        get() = game?.let { !it.external || it.androidAppId != null } == true
+
+    val appIsGame: Boolean
+        get() = app?.id in disk.appGames
 
     val selectedEmulator: Emulator?
         get() = game?.let(emulator)
@@ -365,9 +379,16 @@ class Session(
 
     /** Replaces the library, keeping the selected game where it still exists. */
     fun replaceGames(games: List<Game>) {
+        romGames = games
+        refreshGames()
+    }
+
+    private fun refreshGames() {
+        val updated = romGames + apps.filter { it.id in disk.appGames }.map(InstalledApp::asGame)
+        if (games == updated) return
         val id = game?.id
         closeMenu()
-        this.games = games
+        games = updated
         if (tab !in tabs) tab = Tab.RECENT
         val order = order
         selected =
@@ -382,6 +403,7 @@ class Session(
             (apps.indexOfFirst { it.id == id }.takeIf { it >= 0 } ?: appSelected)
                 .coerceAtMost(apps.lastIndex)
                 .coerceAtLeast(0)
+        refreshGames()
     }
 
     /** Makes `screen` the one the selected app opens on, once Android opened it there. */
@@ -427,6 +449,13 @@ class Session(
                 in MOVES -> appSelected = moved(appSelected, apps.size, APP_ROWS, command)
                 is Command.Pick -> if (command.index in apps.indices) appSelected = command.index
                 Command.B -> chooseTab(Tab.RECENT)
+                Command.Y -> {
+                    val id = app?.id ?: return
+                    changeDisk {
+                        it.copy(appGames = if (appIsGame) it.appGames - id else it.appGames + id)
+                    }
+                    refreshGames()
+                }
                 else -> {}
             }
             return
@@ -440,7 +469,7 @@ class Session(
             }
             inMore && command == Command.Favorite -> toggleFavorite()
             !menu && command is Command.Pick && command.index in order -> selected = command.index
-            command == Command.X && game?.external != true -> {
+            command == Command.X && canShowMore -> {
                 menu = !menu
                 confirm = false
                 moreRow = 0

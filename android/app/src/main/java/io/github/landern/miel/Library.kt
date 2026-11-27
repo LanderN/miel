@@ -250,7 +250,7 @@ fun Library(
                 Modifier.fillMaxWidth().height(Miel.control),
                 horizontalArrangement = Arrangement.spacedBy(Miel.spaceSm),
             ) {
-                if (total > 0 && (apps || session.game?.external != true)) {
+                if (total > 0 && (apps || session.canShowMore)) {
                     Pill(
                         "X",
                         if (apps) session.appScreen.other().label else "More",
@@ -258,6 +258,16 @@ fun Library(
                         primary = false,
                     ) {
                         command(Command.X)
+                    }
+                }
+                if (apps && total > 0) {
+                    Pill(
+                        "Y",
+                        if (session.appIsGame) "Remove from game library"
+                        else "Show in game library",
+                        primary = false,
+                    ) {
+                        command(Command.Y)
                     }
                 }
                 Row(
@@ -545,8 +555,9 @@ private fun ColumnScope.GameGrid(session: Session, art: Art, command: (Command) 
                 Image(
                     cover.image,
                     null,
-                    modifier,
-                    contentScale = ContentScale.Crop,
+                    if (game.androidAppId == null) modifier else modifier.padding(Miel.inset),
+                    contentScale =
+                        if (game.androidAppId == null) ContentScale.Crop else ContentScale.Fit,
                 )
             else
                 Image(
@@ -697,7 +708,7 @@ private fun ColumnScope.AppGrid(session: Session, art: Art, command: (Command) -
         Tile(
             chosen,
             Miel.surface,
-            { command(Command.Pick(index)) },
+            { command(if (chosen) Command.A else Command.Pick(index)) },
             border = true,
         ) {
             Column(

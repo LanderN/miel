@@ -59,6 +59,32 @@ class SessionTest {
     }
 
     @Test
+    fun installedAppsAppearAsGamesOnlyWhenSelectedForTheLibrary() {
+        val installed = apps("example/.MainActivity", "other/.MainActivity")
+        val s = open(1)
+        s.replaceApps(installed)
+        assertFalse(Tab.ANDROID in s.tabs)
+        s.run(Command.ChooseTab(Tab.APPS), Command.Y, Command.ChooseTab(Tab.ANDROID))
+        val game = requireNotNull(s.game)
+        assertEquals(installed.first().id, game.androidAppId)
+        assertTrue(game.playable && game.external)
+        assertEquals(1, s.order.size)
+        s.recordLaunch()
+        s.run(Command.X, Command.Favorite)
+
+        val reopened = Session(file).apply { replaceApps(installed) }
+        assertEquals(game.id, reopened.game?.id)
+        reopened.run(Command.ChooseTab(Tab.FAVORITES))
+        assertEquals(game.id, reopened.game?.id)
+        reopened.replaceApps(installed.drop(1))
+        assertFalse(Tab.ANDROID in reopened.tabs)
+        reopened.replaceApps(installed)
+        reopened.run(Command.ChooseTab(Tab.APPS), Command.Pick(0), Command.Y)
+        assertFalse(Tab.ANDROID in reopened.tabs)
+        assertEquals(installed, reopened.apps)
+    }
+
+    @Test
     fun recentKeepsTheTenLatestGames() {
         val s = open(12)
         repeat(12) {

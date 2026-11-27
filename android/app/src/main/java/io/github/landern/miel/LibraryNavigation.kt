@@ -119,5 +119,6 @@ private val Tab.navigationIcon: Int
             Tab.PSP -> R.drawable.miel_nav_psp
             Tab.GAMECUBE -> R.drawable.miel_nav_gamecube
             Tab.PC -> R.drawable.miel_nav_pc
+            Tab.ANDROID -> R.drawable.miel_nav_android
             Tab.APPS -> R.drawable.miel_nav_apps
         }

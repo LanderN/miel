@@ -68,7 +68,11 @@ class LibraryActivity : ComponentActivity() {
                 { launchApp(it, Screen.BOTTOM) },
             )
         }
-    private val displayListener = Displays.Listener(this) { lowerArtwork.show() }
+    private var androidGameOpen = false
+    private val displayListener =
+        Displays.Listener(this) {
+            if (!androidGameOpen) lowerArtwork.show()
+        }
     private var overlay by mutableStateOf<Overlay?>(null)
     private val typing: Boolean
         get() =
@@ -205,6 +209,7 @@ class LibraryActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        androidGameOpen = false
         lowerArtwork.dim(false)
         sounds.setActive(true)
         library.refreshStreams()
@@ -243,6 +248,9 @@ class LibraryActivity : ComponentActivity() {
                 }
 
     private fun cover(game: Game): Cover? {
+        game.androidAppId?.let { id ->
+            return image(apps.iconPath(id))?.let { Cover(it, boxart = false) }
+        }
         artworkVersion
         image(artwork.coverPath(game))?.let {
             return Cover(it, boxart = true)
@@ -263,6 +271,9 @@ class LibraryActivity : ComponentActivity() {
             } ?: Hero("No apps", "", "")
         } else {
             session.game?.let { game ->
+                game.androidAppId?.let {
+                    return Hero(game.title, game.platform, apps.iconPath(it), icon = true)
+                }
                 val frame = artwork.frame(game)?.takeIf { it.isFile }
                 val detail =
                     listOf(game.platform, if (game.year > 0) "${game.year}" else "", game.genre)
@@ -313,14 +324,14 @@ class LibraryActivity : ComponentActivity() {
         }
         if (session.tab == Tab.APPS) {
             when (command) {
+                Command.Y -> {
+                    if (session.app == null) return
+                    session.command(command)
+                    sounds.play(if (session.error.isEmpty()) Cue.CONFIRM else Cue.ERROR)
+                    return
+                }
                 Command.A,
                 Command.X -> return openApp(other = command == Command.X)
-                // A touched app opens.
-                is Command.Pick ->
-                    if (command.index in session.apps.indices) {
-                        session.command(command)
-                        return openApp(other = false)
-                    }
                 else -> {}
             }
         }
@@ -365,6 +376,16 @@ class LibraryActivity : ComponentActivity() {
         if (command == Command.A && session.tab != Tab.APPS) {
             val game = session.game ?: return
             if (!game.playable) return fail(UNPLAYABLE)
+            game.androidAppId?.let { id ->
+                if (!session.menu) {
+                    val component = ComponentName.unflattenFromString(id) ?: return fail(UNPLAYABLE)
+                    if (openExternal(Intent.makeMainActivity(component), game.title)) {
+                        androidGameOpen = true
+                        lowerArtwork.close()
+                    }
+                }
+                return
+            }
             if (DroidDeck.isGame(game)) {
                 openExternal(
                     Intent(Intent.ACTION_VIEW, Uri.parse(game.romUri))
@@ -1269,6 +1290,7 @@ class LibraryActivity : ComponentActivity() {
 
     /** Searches HowLongToBeat for `game` once it stays selected, unless it was looked up. */
     private suspend fun lookupTimes(game: Game) {
+        if (game.androidAppId != null) return
         if (game.id in timesFailed || HowLongToBeat.cached(this, game) != null) return
         delay(600)
         try {

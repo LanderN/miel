@@ -37,7 +37,7 @@ Demo library with homebrew artwork, captured in the emulator. [Game and artwork 
   miel downloads matching covers and screenshots from Libretro when artwork is missing.
 - **Controller or touch.** Browse, launch and change settings with the Thor's controls. Touch works
   too.
-- **Your Android apps, too.** Open apps on either screen. miel remembers which screen you chose.
+- **Your Android apps, too.** Open apps on either screen. miel remembers which screen you chose. Select an app and choose **Show in game library** to give it a tile in **Android**, with favorites and recent play. Games launched from **Android** open on the upper screen and manage their own saves.
 
 miel embeds [Azahar](https://azahar-emu.org) for 3DS,
 [melonDS DS](https://github.com/JesseTG/melonds-ds) for DS,

@@ -67,11 +67,11 @@ data class Game(
     val deletable: Boolean
         get() = core != null && (romUri.startsWith("content://") || downloaded)
 
-    /**
-     * Launched through another app: a DroidDeck export or a Vibepollo app streamed by Moonlight.
-     */
+    val androidAppId: String?
+        get() = romUri.takeIf { it.startsWith(ANDROID_URI) }?.removePrefix(ANDROID_URI)
+
     val external: Boolean
-        get() = DroidDeck.isGame(this) || Moonlight.isGame(this)
+        get() = androidAppId != null || DroidDeck.isGame(this) || Moonlight.isGame(this)
 
     /** The Steam app ID of a DroidDeck export or a Vibepollo app, or an empty string. */
     val steamId: String
@@ -79,6 +79,11 @@ data class Game(
 
     val playable: Boolean
         get() = external || (romUri.isNotEmpty() && core?.accepts(romFilename) == true)
+
+    companion object {
+        const val ANDROID_URI = "android-app:"
+        const val ANDROID_PLATFORM = "Android"
+    }
 }
 
 /**

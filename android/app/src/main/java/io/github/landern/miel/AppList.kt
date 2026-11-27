@@ -22,7 +22,18 @@ data class InstalledApp(
     /** The launcher activity's flattened component name. */
     val id: String,
     val label: String,
-)
+) {
+    fun asGame() =
+        Game(
+            id = Game.ANDROID_URI + id,
+            title = label,
+            platform = Game.ANDROID_PLATFORM,
+            region = "",
+            system = "",
+            romUri = Game.ANDROID_URI + id,
+            romFilename = "",
+        )
+}
 
 /**
  * The apps in the library's Apps tab: every launcher activity of this user except miel's, sorted by
